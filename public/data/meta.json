@@ -1,0 +1,8 @@
+{
+  "n": 400,
+  "extension_m": 20000,
+  "elev_min_m": -2691.91455078125,
+  "elev_max_m": -1651.5811767578125,
+  "orden": "fila 0 = Norte, columna 0 = Oeste",
+  "fuente": "DTM CTX 20 m de Mars 2020 (USGS)"
+}
