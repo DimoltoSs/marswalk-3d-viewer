@@ -1,0 +1,8 @@
+# Dependencias de los scripts de exportación (exportar_terrenos.py, exportar_rutas.py).
+# El visor en sí solo necesita Node.js (ver package.json).
+numpy
+rasterio
+Pillow
+# exportar_rutas.py importa el planificador de ../prototipo_uno, que además usa:
+scipy
+scikit-image

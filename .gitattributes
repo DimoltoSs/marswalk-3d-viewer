@@ -1,0 +1,8 @@
+# Normaliza los saltos de línea (Windows CRLF / Linux LF) en los archivos de texto
+* text=auto
+
+# Archivos binarios: git no debe intentar compararlos ni convertirlos
+*.bin  binary
+*.glb  binary
+*.jpg  binary
+*.png  binary

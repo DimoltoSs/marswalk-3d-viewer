@@ -1,0 +1,22 @@
+# Dependencias de Node (se reinstalan con `npm install`)
+node_modules/
+
+# Build de producción (se genera con `npm run build`)
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Modelos originales descargados (el que usa el visor está en public/modelos/)
+modelos_3d/
+*.usdz
+
+# Editor y sistema operativo
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
