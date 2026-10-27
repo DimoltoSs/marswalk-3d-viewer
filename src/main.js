@@ -6,6 +6,7 @@ import { cargarDatosRutas, crearRutas } from './rutas.js';
 import { cargarRover, crearRecorrido } from './rover.js';
 import { crearInterfaz, aviso } from './interfaz.js';
 import { crearSeleccion } from './seleccion.js';
+import { mostrarMetricas } from './metricas.js';
 
 async function iniciar() {
   const canvas = document.getElementById('lienzo');
@@ -67,8 +68,10 @@ async function iniciar() {
     datosRutas = await cargarDatosRutas('rutas_v2.json');
     rutas = crearRutas(terreno, datosRutas);
     scene.add(rutas.grupo);
+    mostrarMetricas(datosRutas);
   } catch (err) {
     aviso(`${err.message}. Se muestra solo el terreno.`);
+    mostrarMetricas(null);
   }
 
   // ---- 3. Rover ----
@@ -112,6 +115,7 @@ async function iniciar() {
         aviso(err.message);
         return;
       }
+      mostrarMetricas(datosRutas);
       if (rutas) rutas.reconstruir(datosRutas);
       else { rutas = crearRutas(terreno, datosRutas); scene.add(rutas.grupo); }
       seleccion.refrescar();                    // el plan cambió: se cierra la ficha

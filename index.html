@@ -36,6 +36,43 @@
     .muestra { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
     .valor { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
 
+    /* ---- Panel de métricas (derecha) ---- */
+    #metricas {
+      position: absolute; top: 12px; right: 12px; width: 290px;
+      max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+      background: rgba(30, 20, 15, 0.78); color: #f3e6d8;
+      font: 12px/1.4 system-ui, sans-serif;
+      border-radius: 8px; padding: 10px 12px;
+      backdrop-filter: blur(4px);
+    }
+    #metricas-titulo { margin: 0; font-size: 14px; cursor: pointer; user-select: none; }
+    #metricas-titulo::after { content: ' ▾'; opacity: 0.6; }
+    #metricas.plegado #metricas-titulo::after { content: ' ▸'; }
+    #metricas.plegado #metricas-contenido { display: none; }
+    .nota { margin: 6px 0 0; font-size: 11px; opacity: 0.6; }
+    .kpi-grande { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .kpi-grande div { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .kpi-grande b { font-size: 20px; color: #fff; }
+    .kpi-grande span { font-size: 11px; opacity: 0.65; }
+    .kpi { margin-top: 4px; }
+    .kpi-fila { display: flex; justify-content: space-between; }
+    .barra { height: 5px; background: #4a3428; border-radius: 3px; overflow: hidden; margin-top: 2px; }
+    .barra div { height: 100%; background: #ffd23f; }
+    table.vs { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    table.vs th { font-weight: 600; opacity: 0.65; text-align: right; font-size: 11px; }
+    table.vs td { padding: 1px 0; text-align: right; }
+    table.vs td:first-child { text-align: left; opacity: 0.8; }
+    .bien { color: #6ee08a; }
+    .mal { color: #ff7a6b; }
+    .marcador { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    .marcador span { width: 105px; flex-shrink: 0; font-size: 11px; }
+    .apilada { flex: 1; display: flex; height: 14px; border-radius: 3px; overflow: hidden; font-size: 10px; }
+    .apilada div { display: flex; align-items: center; justify-content: center; color: #1e140f; font-weight: 600; }
+    .g { background: #6ee08a; }
+    .e { background: #a89a8c; }
+    .p { background: #ff7a6b; }
+    .cuadro { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-left: 4px; }
+
     /* ---- Ficha de un objetivo (clic en un pin) ---- */
     #ficha {
       position: absolute; transform: translate(-50%, calc(-100% - 8px));
@@ -95,6 +132,11 @@
       <label><input type="checkbox" id="seguir"> Cámara sigue al rover</label>
       <button id="pausa">⏸ Pausa</button>
     </div>
+  </div>
+
+  <div id="metricas">
+    <h2 id="metricas-titulo">Métricas</h2>
+    <div id="metricas-contenido"><p class="nota">Cargando…</p></div>
   </div>
 
   <div id="ficha" hidden></div>
