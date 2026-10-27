@@ -32,6 +32,8 @@ async function iniciar() {
   camera.position.set(40, 70, 90);              // vista inicial: centrada en la zona de las rutas
   controles.target.set(-25, 0, 0);
 
+  renderer.shadowMap.needsUpdate = true;        // calcular las sombras una vez, ya con todo cargado
+
   // Bucle: dt = segundos desde el cuadro anterior (para que la velocidad no dependa de los FPS)
   let antes = performance.now();
   function animar(ahora) {

@@ -16,8 +16,11 @@ export async function cargarRover({ url = '/modelos/perseverance.glb', escalaVis
   const centro = caja.getCenter(new THREE.Vector3());
   modelo.position.set(-centro.x, -caja.min.y, -centro.z);
 
+  // Sin sombras en el rover: las sombras están "horneadas" (ver escena.js), así que una
+  // sombra del rover se quedaría congelada en el inicio. Además ahorra dibujar 200k
+  // triángulos extra en cada cuadro.
   modelo.traverse((o) => {
-    if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; }
   });
 
   // "Pivote": un grupo vacío que contiene al modelo. Movemos y giramos el pivote,

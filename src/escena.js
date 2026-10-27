@@ -5,9 +5,12 @@ const CIELO = 0xc9a27e;   // color "butterscotch" del cielo marciano
 export function crearEscena(canvas) {
   // ---- Renderer ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));   // 1.5 basta; 2 = casi el doble de píxeles
   renderer.shadowMap.enabled = true;                    // activa el cálculo de sombras
   renderer.shadowMap.type = THREE.PCFShadowMap;         // sombras filtradas (bordes suaves)
+  // Sombras "horneadas": el terreno no se mueve, así que el mapa de sombras se calcula
+  // una sola vez. Para recalcularlo: renderer.shadowMap.needsUpdate = true
+  renderer.shadowMap.autoUpdate = false;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;   // colores más "fotográficos"
 
   // ---- Escena con cielo y niebla ----
