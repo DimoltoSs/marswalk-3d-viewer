@@ -5,6 +5,7 @@ import { cargarTerreno } from './terreno.js';
 import { cargarDatosRutas, crearRutas } from './rutas.js';
 import { cargarRover, crearRecorrido } from './rover.js';
 import { crearInterfaz, aviso } from './interfaz.js';
+import { crearSeleccion } from './seleccion.js';
 
 async function iniciar() {
   const canvas = document.getElementById('lienzo');
@@ -23,6 +24,7 @@ async function iniciar() {
   let terreno = null, rutas = null, rover = null, recorrido = null;
   let seguir = false;
   const opcionesRecorrido = { velocidad_m_s: 300 };
+  const seleccion = crearSeleccion(camera, canvas, () => rutas?.capas.objetivos);
 
   // ---- Bucle de animación: arranca YA, aunque todavía no haya nada cargado ----
   const delta = new THREE.Vector3();
@@ -38,6 +40,7 @@ async function iniciar() {
       camera.position.add(delta);
     }
     controles.update();
+    seleccion.actualizar();                     // la ficha del objetivo sigue a su pin
     renderer.render(scene, camera);
     requestAnimationFrame(animar);
   }
@@ -88,6 +91,7 @@ async function iniciar() {
     exageracion(valor) {
       terreno.aplicarExageracion(valor);
       rutas?.reconstruir();                     // los tubos y pines se vuelven a pegar al suelo
+      seleccion.refrescar();
       recalcularSombras();                      // el relieve cambió: hay que recalcular sombras
     },
     pausa(pausado) {
@@ -110,6 +114,7 @@ async function iniciar() {
       }
       if (rutas) rutas.reconstruir(datosRutas);
       else { rutas = crearRutas(terreno, datosRutas); scene.add(rutas.grupo); }
+      seleccion.refrescar();                    // el plan cambió: se cierra la ficha
       if (rover) {
         recorrido = crearRecorrido(terreno, rover, datosRutas.plan, opcionesRecorrido);
         recorrido.estado.pausado = !!opcionesRecorrido.pausado;

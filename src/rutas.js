@@ -68,7 +68,9 @@ export function crearRutas(terreno, datos) {
     capas.plan.add(crearPin(terreno, ...datos.inicio, COLORES.inicio));
     capas.plan.add(crearPin(terreno, ...datos.meta, COLORES.meta));
     for (const o of datos.objetivos) {
-      capas.objetivos.add(crearPin(terreno, o.x, o.y, COLORES.objetivo, 4));
+      const pin = crearPin(terreno, o.x, o.y, COLORES.objetivo, 4);
+      pin.userData.objetivo = o;      // datos del objetivo, para la ficha al hacer clic
+      capas.objetivos.add(pin);
     }
   }
   reconstruir();
