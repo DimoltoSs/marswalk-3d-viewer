@@ -48,14 +48,16 @@ function crearPin(terreno, x, y, color, alto = 3) {
  * Crea todas las rutas y marcadores. Devuelve un objeto con:
  *  - grupo: lo que se agrega a la escena
  *  - capas: { real, plan, objetivos } para prender/apagar cada una
- *  - reconstruir(): vuelve a crearlas (p. ej. si cambia la exageración del terreno)
+ *  - reconstruir(nuevosDatos?): vuelve a crearlas, p. ej. si cambia la exageración del
+ *    terreno, o con otros datos si se cambia de plan (v1 / v2)
  */
 export function crearRutas(terreno, datos) {
   const grupo = new THREE.Group();
   const capas = { real: new THREE.Group(), plan: new THREE.Group(), objetivos: new THREE.Group() };
   grupo.add(capas.real, capas.plan, capas.objetivos);
 
-  function reconstruir() {
+  function reconstruir(nuevosDatos) {
+    if (nuevosDatos) datos = nuevosDatos;
     // vaciar lo anterior (y liberar memoria de la GPU)
     for (const capa of Object.values(capas)) {
       capa.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });

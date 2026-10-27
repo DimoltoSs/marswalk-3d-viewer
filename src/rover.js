@@ -36,7 +36,8 @@ export async function cargarRover({ url = '/modelos/perseverance.glb', escalaVis
 
 /**
  * Hace que el rover recorra una ruta [[x, y], ...] en metros, siguiendo el terreno.
- * Devuelve { actualizar(dt), pausado } para llamarlo desde el bucle de animación.
+ * Devuelve { actualizar(dt), estado, largo }. En estado se puede cambiar
+ * pausado (true/false) y velocidad (m/s simulados por segundo real) en vivo.
  */
 export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelanto_m = 150 } = {}) {
   // Distancia acumulada en cada punto: permite ubicar "el punto a d metros del inicio"
@@ -57,7 +58,7 @@ export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelan
     return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
   }
 
-  const estado = { distancia: 0, pausado: false };
+  const estado = { distancia: 0, pausado: false, velocidad: velocidad_m_s };
 
   function colocar() {
     const [x, y] = puntoEn(estado.distancia);
@@ -68,7 +69,7 @@ export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelan
 
   function actualizar(dt) {
     if (!estado.pausado) {
-      estado.distancia += velocidad_m_s * dt;
+      estado.distancia += estado.velocidad * dt;
       if (estado.distancia > largo) estado.distancia = 0;      // al llegar, vuelve a empezar
     }
     colocar();

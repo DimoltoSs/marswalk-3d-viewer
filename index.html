@@ -7,10 +7,86 @@
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #c9a27e; }
     #lienzo { display: block; width: 100%; height: 100%; }
+
+    /* ---- Panel de controles ---- */
+    #panel {
+      position: absolute; top: 12px; left: 12px; width: 230px;
+      background: rgba(30, 20, 15, 0.78); color: #f3e6d8;
+      font: 13px/1.4 system-ui, sans-serif;
+      border-radius: 8px; padding: 10px 12px;
+      backdrop-filter: blur(4px);
+      user-select: none;
+    }
+    #panel-titulo { margin: 0; font-size: 14px; cursor: pointer; }
+    #panel-titulo::after { content: ' ▾'; opacity: 0.6; }
+    #panel.plegado #panel-titulo::after { content: ' ▸'; }
+    #panel.plegado .seccion { display: none; }
+    .seccion { margin-top: 10px; }
+    .seccion h3 {
+      margin: 0 0 4px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.65;
+    }
+    #panel label { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    #panel input[type=range] { flex: 1; min-width: 0; }
+    #panel select, #panel button {
+      width: 100%; margin-top: 2px; padding: 4px;
+      background: #4a3428; color: inherit; border: 1px solid #6b4a3a; border-radius: 4px;
+      font: inherit; cursor: pointer;
+    }
+    .muestra { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
+    .valor { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ---- Avisos (archivos que faltan, etc.) ---- */
+    #avisos {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      font: 13px system-ui, sans-serif; color: #fff;
+    }
+    #avisos div { background: rgba(160, 30, 30, 0.85); padding: 6px 12px; border-radius: 6px; margin-top: 6px; }
   </style>
 </head>
 <body>
   <canvas id="lienzo"></canvas>
+
+  <div id="panel">
+    <h2 id="panel-titulo">Jezero · Marswalk</h2>
+
+    <div class="seccion">
+      <h3>Plan</h3>
+      <select id="plan">
+        <option value="rutas_v2.json">v2 · misión del notebook</option>
+        <option value="rutas.json">v1 · prototipo_uno</option>
+      </select>
+    </div>
+
+    <div class="seccion">
+      <h3>Capas</h3>
+      <label><input type="checkbox" data-capa="plan" checked>
+        <span class="muestra" style="background:#ff3b3b"></span> Nuestro plan</label>
+      <label><input type="checkbox" data-capa="real" checked>
+        <span class="muestra" style="background:#fff"></span> Ruta real (NASA)</label>
+      <label><input type="checkbox" data-capa="objetivos" checked>
+        <span class="muestra" style="background:#ffd23f"></span> Objetivos</label>
+    </div>
+
+    <div class="seccion">
+      <h3>Relieve</h3>
+      <label>Exageración
+        <input type="range" id="exageracion" min="1" max="6" step="0.5" value="3">
+        <span class="valor" id="exageracion-valor">3×</span></label>
+    </div>
+
+    <div class="seccion">
+      <h3>Rover</h3>
+      <label>Velocidad
+        <input type="range" id="velocidad" min="0" max="1500" step="50" value="300">
+        <span class="valor" id="velocidad-valor">300 m/s</span></label>
+      <label><input type="checkbox" id="seguir"> Cámara sigue al rover</label>
+      <button id="pausa">⏸ Pausa</button>
+    </div>
+  </div>
+
+  <div id="avisos"></div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
