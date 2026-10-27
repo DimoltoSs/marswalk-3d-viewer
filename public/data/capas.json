@@ -1,0 +1,74 @@
+{
+  "crism": {
+    "archivo": "capa_crism.png",
+    "titulo": "Minerales (CRISM)",
+    "leyenda": [
+      {
+        "nombre": "Olivine",
+        "color": "#ff0000",
+        "valor": 0.6
+      },
+      {
+        "nombre": "Mg-Carbonate",
+        "color": "#00ff00",
+        "valor": 1.0
+      },
+      {
+        "nombre": "Fe/Mg-Smectite",
+        "color": "#00ffff",
+        "valor": 1.0
+      },
+      {
+        "nombre": "Olivine+Smectite",
+        "color": "#ff8072",
+        "valor": 0.8
+      },
+      {
+        "nombre": "Olv.Smect+2.2um",
+        "color": "#808000",
+        "valor": 0.8
+      },
+      {
+        "nombre": "Carb.+2.2um",
+        "color": "#ffd700",
+        "valor": 1.0
+      },
+      {
+        "nombre": "High-Ca Pyroxene",
+        "color": "#ff8000",
+        "valor": 0.4
+      },
+      {
+        "nombre": "Low-Ca Pyroxene",
+        "color": "#daa520",
+        "valor": 0.4
+      },
+      {
+        "nombre": "Kaolinite",
+        "color": "#8b4513",
+        "valor": 1.0
+      },
+      {
+        "nombre": "Mg-Smectite 2",
+        "color": "#0000ff",
+        "valor": 1.0
+      }
+    ]
+  },
+  "costo": {
+    "archivo": "capa_costo.png",
+    "titulo": "Mapa de costos",
+    "escala": {
+      "min": 1.0,
+      "max": 2.67,
+      "colores": [
+        "#006837",
+        "#87cb67",
+        "#fffebe",
+        "#f88c51",
+        "#a50026"
+      ]
+    },
+    "bloqueado": "#46005a"
+  }
+}

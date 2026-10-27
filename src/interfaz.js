@@ -11,6 +11,8 @@
  *   velocidad(m_s)          m/s simulados por segundo real
  *   seguir(activo)          cámara que sigue al rover
  *   plan(archivo)           'rutas_v2.json' | 'rutas.json'
+ *   capaTerreno(nombre)     'crism' | 'costo' | null
+ *   opacidadCapa(valor)     0.1..1
  * }
  */
 export function crearInterfaz(acciones) {
@@ -26,6 +28,14 @@ export function crearInterfaz(acciones) {
   exa.addEventListener('input', () => {
     $('exageracion-valor').textContent = `${exa.value}×`;
     acciones.exageracion(Number(exa.value));
+  });
+
+  // ---- Capa sobre el terreno (CRISM / costos) ----
+  $('capa').addEventListener('change', (e) => acciones.capaTerreno(e.target.value || null));
+  const opa = $('capa-opacidad');
+  opa.addEventListener('input', () => {
+    $('capa-opacidad-valor').textContent = `${Math.round(opa.value * 100)} %`;
+    acciones.opacidadCapa(Number(opa.value));
   });
 
   // ---- Rover: pausa y velocidad ----

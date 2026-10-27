@@ -7,6 +7,7 @@ import { cargarRover, crearRecorrido } from './rover.js';
 import { crearInterfaz, aviso } from './interfaz.js';
 import { crearSeleccion } from './seleccion.js';
 import { mostrarMetricas } from './metricas.js';
+import { cargarCapas } from './capas.js';
 
 async function iniciar() {
   const canvas = document.getElementById('lienzo');
@@ -22,7 +23,7 @@ async function iniciar() {
   controles.target.set(-25, 0, 0);
 
   // Lo que se va cargando. Si algo falla queda en null y el resto sigue funcionando.
-  let terreno = null, rutas = null, rover = null, recorrido = null;
+  let terreno = null, rutas = null, rover = null, recorrido = null, capas = null;
   let seguir = false;
   const opcionesRecorrido = { velocidad_m_s: 300 };
   const seleccion = crearSeleccion(camera, canvas, () => rutas?.capas.objetivos);
@@ -60,6 +61,15 @@ async function iniciar() {
   } catch (err) {
     aviso(`No se pudo cargar el terreno: ${err.message}. ¿Corriste exportar_terrenos.py?`);
     return;
+  }
+
+  // ---- 1b. Capas sobre el terreno (CRISM, costos). Opcionales ----
+  try {
+    capas = await cargarCapas(terreno, renderer.capabilities.getMaxAnisotropy());
+    scene.add(capas.mesh);
+  } catch (err) {
+    aviso(err.message);
+    document.getElementById('capa').disabled = true;
   }
 
   // ---- 2. Rutas ----
@@ -107,6 +117,16 @@ async function iniciar() {
     },
     seguir(activo) {
       seguir = activo && !!rover;
+    },
+    async capaTerreno(nombre) {
+      try {
+        await capas?.mostrar(nombre);
+      } catch (err) {
+        aviso(`No se pudo cargar la capa "${nombre}": ${err.message}`);
+      }
+    },
+    opacidadCapa(valor) {
+      capas?.opacidad(valor);
     },
     async plan(archivo) {
       try {
