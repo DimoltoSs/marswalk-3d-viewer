@@ -8,9 +8,17 @@ const COLORES = {
   meta: 0xff3bd8,
 };
 
-/** Lee rutas.json (lo genera exportar_rutas.py). */
-export async function cargarDatosRutas() {
-  return (await fetch('/data/rutas.json')).json();
+/**
+ * Lee un archivo de rutas de public/data/:
+ *  - rutas_v2.json: misión del notebook planificador_v2 (por defecto)
+ *  - rutas.json:    plan v1 de prototipo_uno (exportar_rutas.py)
+ */
+export async function cargarDatosRutas(archivo = 'rutas_v2.json') {
+  const resp = await fetch(`/data/${archivo}`);
+  // Ojo: si el archivo no existe, Vite responde con index.html (HTML, no JSON)
+  const esJson = resp.headers.get('content-type')?.includes('json');
+  if (!resp.ok || !esJson) throw new Error(`No se encontró /data/${archivo}`);
+  return resp.json();
 }
 
 /** Un tubo 3D que sigue una lista de puntos [x, y] en metros, pegado al terreno. */
