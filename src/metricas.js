@@ -1,9 +1,9 @@
 /**
- * Panel de métricas (derecha): números de la misión y comparación con Perseverance.
- * Lee lo que exporta el notebook en rutas_v2.json:
+ * Panel de métricas: nuestra misión y su comparación con Perseverance.
+ * Datos de rutas_v2.json, generado por el notebook planificador_v2:
  *   metricas, presupuesto, supuestos  -> sección 12
  *   comparacion                       -> sección 13.4
- * Con rutas.json (v1) solo hay costo_total / presupuesto: se muestra eso.
+ * El plan v1 (rutas.json) solo tiene costo_total y presupuesto.
  */
 
 // Clic en el título: plegar / desplegar
@@ -12,7 +12,7 @@ document.getElementById('metricas-titulo')
 
 const fmt = (v, dec = 0) => v.toLocaleString('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
-/** Barra de uso del presupuesto: "144 / 168 h" con una barrita que se llena. */
+/** Uso del presupuesto, p. ej. "144 / 168 h", con barra de progreso. */
 function barra(nombre, usado, total, unidad, dec = 0) {
   const pct = Math.min(100, (100 * usado) / total);
   return `
@@ -22,7 +22,7 @@ function barra(nombre, usado, total, unidad, dec = 0) {
     </div>`;
 }
 
-/** Fila NASA vs nosotros, con el cambio en % pintado de verde si es mejor. */
+/** Fila NASA vs. nuestra misión; el cambio en % va en verde si es mejora. */
 function filaVs(nombre, nasa, nuestra, dec, masEsMejor = false) {
   const cambio = (100 * (nuestra - nasa)) / nasa;
   const mejor = masEsMejor ? cambio > 0 : cambio < 0;
@@ -31,7 +31,7 @@ function filaVs(nombre, nasa, nuestra, dec, masEsMejor = false) {
           <td class="${mejor ? 'bien' : 'mal'}">${signo}${fmt(cambio)} %</td></tr>`;
 }
 
-/** Barra apilada: tramos ganados / empatados / perdidos. */
+/** Barra apilada con los tramos ganados / empatados / perdidos de una métrica. */
 function marcador(m, total) {
   const ancho = (n) => `${(100 * n) / total}%`;
   return `
@@ -45,12 +45,13 @@ function marcador(m, total) {
     </div>`;
 }
 
+/** Dibuja el panel para el plan cargado (null = sin datos). */
 export function mostrarMetricas(datos) {
   const caja = document.getElementById('metricas-contenido');
 
   if (!datos) { caja.innerHTML = '<p class="nota">Sin datos de rutas.</p>'; return; }
 
-  // ---- Plan v1: solo hay costo ----
+  // ---- Plan v1: solo costo ----
   if (!datos.metricas) {
     caja.innerHTML = `
       <div class="seccion"><h3>Plan v1 · prototipo_uno</h3>

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 const COLORES = {
   real: 0xffffff,      // ruta real de Perseverance
-  plan: 0xff3b3b,      // tu plan A*
+  plan: 0xff3b3b,      // nuestro plan
   objetivo: 0xffd23f,  // objetivos científicos
   inicio: 0x3dff6e,
   meta: 0xff3bd8,
@@ -15,21 +15,21 @@ const COLORES = {
  */
 export async function cargarDatosRutas(archivo = 'rutas_v2.json') {
   const resp = await fetch(`/data/${archivo}`);
-  // Ojo: si el archivo no existe, Vite responde con index.html (HTML, no JSON)
+  // Si el archivo no existe, Vite responde 200 con index.html: hay que revisar el tipo
   const esJson = resp.headers.get('content-type')?.includes('json');
   if (!resp.ok || !esJson) throw new Error(`No se encontró /data/${archivo}`);
   return resp.json();
 }
 
-/** Un tubo 3D que sigue una lista de puntos [x, y] en metros, pegado al terreno. */
+/** Tubo 3D que sigue una lista de puntos [x, y] en metros, apoyado en el terreno. */
 function crearTubo(terreno, xy, color, radio) {
   const puntos = xy.map(([x, y]) => terreno.aEscena(x, y, radio + 0.1));
-  const curva = new THREE.CatmullRomCurve3(puntos, false, 'centripetal');
+  const curva = new THREE.CatmullRomCurve3(puntos, false, 'centripetal');   // centrípeta: sin bucles en curvas cerradas
   const geometria = new THREE.TubeGeometry(curva, puntos.length * 4, radio, 8, false);
   return new THREE.Mesh(geometria, new THREE.MeshBasicMaterial({ color }));
 }
 
-/** Un marcador tipo "pin" (cono invertido + esfera) en (x, y) metros. */
+/** Marcador tipo pin (cono invertido + esfera) en (x, y) metros. */
 function crearPin(terreno, x, y, color, alto = 3) {
   const pin = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
@@ -45,11 +45,10 @@ function crearPin(terreno, x, y, color, alto = 3) {
 }
 
 /**
- * Crea todas las rutas y marcadores. Devuelve un objeto con:
+ * Crea las rutas y marcadores. Devuelve:
  *  - grupo: lo que se agrega a la escena
- *  - capas: { real, plan, objetivos } para prender/apagar cada una
- *  - reconstruir(nuevosDatos?): vuelve a crearlas, p. ej. si cambia la exageración del
- *    terreno, o con otros datos si se cambia de plan (v1 / v2)
+ *  - capas: { real, plan, objetivos }, para mostrar u ocultar cada una
+ *  - reconstruir(nuevosDatos?): las vuelve a crear al cambiar la exageración o el plan
  */
 export function crearRutas(terreno, datos) {
   const grupo = new THREE.Group();
@@ -58,7 +57,7 @@ export function crearRutas(terreno, datos) {
 
   function reconstruir(nuevosDatos) {
     if (nuevosDatos) datos = nuevosDatos;
-    // vaciar lo anterior (y liberar memoria de la GPU)
+    // Liberar la memoria de GPU de lo anterior antes de crear lo nuevo
     for (const capa of Object.values(capas)) {
       capa.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
       capa.clear();
@@ -69,7 +68,7 @@ export function crearRutas(terreno, datos) {
     capas.plan.add(crearPin(terreno, ...datos.meta, COLORES.meta));
     for (const o of datos.objetivos) {
       const pin = crearPin(terreno, o.x, o.y, COLORES.objetivo, 4);
-      pin.userData.objetivo = o;      // datos del objetivo, para la ficha al hacer clic
+      pin.userData.objetivo = o;      // lo usa seleccion.js para la ficha
       capas.objetivos.add(pin);
     }
   }

@@ -13,57 +13,58 @@ async function iniciar() {
   const canvas = document.getElementById('lienzo');
   const { renderer, scene, camera } = crearEscena(canvas);
 
-  // Controles de ratón: arrastrar = girar, rueda = zoom, clic derecho = mover
+  // Ratón: arrastrar = girar, rueda = zoom, clic derecho = desplazar
   const controles = new OrbitControls(camera, canvas);
-  controles.enableDamping = true;               // movimiento suave
-  controles.maxPolarAngle = Math.PI * 0.48;     // no dejar que la cámara pase bajo el suelo
+  controles.enableDamping = true;
+  controles.maxPolarAngle = Math.PI * 0.48;     // la cámara no baja del horizonte
   controles.minDistance = 2;
   controles.maxDistance = 400;
-  camera.position.set(40, 70, 90);              // vista inicial: centrada en la zona de las rutas
+  camera.position.set(40, 70, 90);              // vista inicial sobre la zona de las rutas
   controles.target.set(-25, 0, 0);
 
-  // Lo que se va cargando. Si algo falla queda en null y el resto sigue funcionando.
+  // Cada parte se carga por separado: si una falla queda en null y el resto sigue funcionando.
   let terreno = null, rutas = null, rover = null, recorrido = null, capas = null;
   let seguir = false;
   const opcionesRecorrido = { velocidad_m_s: 300 };
   const seleccion = crearSeleccion(camera, canvas, () => rutas?.capas.objetivos);
 
-  // ---- Bucle de animación: arranca YA, aunque todavía no haya nada cargado ----
+  // ---- Bucle de animación: arranca antes de cargar los datos ----
   const delta = new THREE.Vector3();
   let antes = performance.now();
   function animar(ahora) {
-    const dt = Math.min((ahora - antes) / 1000, 0.1);   // tope: si la pestaña estuvo oculta
+    const dt = Math.min((ahora - antes) / 1000, 0.1);   // tope por si la pestaña estuvo en segundo plano
     antes = ahora;
     recorrido?.actualizar(dt);
     if (seguir && rover) {
-      // mover cámara y objetivo lo mismo que se movió el rover: se conserva el ángulo de vista
+      // Desplazar cámara y objetivo lo mismo que el rover: se conserva el ángulo de vista
       delta.subVectors(rover.position, controles.target);
       controles.target.add(delta);
       camera.position.add(delta);
     }
     controles.update();
-    seleccion.actualizar();                     // la ficha del objetivo sigue a su pin
+    seleccion.actualizar();
     renderer.render(scene, camera);
     requestAnimationFrame(animar);
   }
   requestAnimationFrame(animar);
 
+  // Las sombras están precalculadas (escena.js): se regeneran solo cuando algo cambia
   const recalcularSombras = () => { renderer.shadowMap.needsUpdate = true; };
 
-  // ---- 1. Terreno (sin él no hay nada que mostrar) ----
+  // ---- 1. Terreno (obligatorio) ----
   try {
     terreno = await cargarTerreno({
       exageracion: 3,
       anisotropia: renderer.capabilities.getMaxAnisotropy(),
     });
     scene.add(terreno.mesh);
-    recalcularSombras();                        // primera sombra (el mapa de sombras debe existir antes de dibujar)
+    recalcularSombras();                        // el mapa de sombras debe existir antes del primer cuadro
   } catch (err) {
-    aviso(`No se pudo cargar el terreno: ${err.message}. ¿Corriste exportar_terrenos.py?`);
+    aviso(`No se pudo cargar el terreno: ${err.message} (se genera con exportar_terrenos.py)`);
     return;
   }
 
-  // ---- 1b. Capas sobre el terreno (CRISM, costos). Opcionales ----
+  // ---- 2. Capas sobre el terreno: CRISM y costos (opcionales) ----
   try {
     capas = await cargarCapas(terreno, renderer.capabilities.getMaxAnisotropy());
     scene.add(capas.mesh);
@@ -72,7 +73,7 @@ async function iniciar() {
     document.getElementById('capa').disabled = true;
   }
 
-  // ---- 2. Rutas ----
+  // ---- 3. Rutas y métricas ----
   let datosRutas = null;
   try {
     datosRutas = await cargarDatosRutas('rutas_v2.json');
@@ -84,7 +85,7 @@ async function iniciar() {
     mostrarMetricas(null);
   }
 
-  // ---- 3. Rover ----
+  // ---- 4. Rover ----
   try {
     rover = await cargarRover({ escalaVisual: 60 });
     scene.add(rover);
@@ -94,22 +95,22 @@ async function iniciar() {
     console.error(err);
   }
 
-  recalcularSombras();                          // de nuevo, ya con rutas y pines
+  recalcularSombras();                          // ahora con rutas y pines
 
-  // ---- 4. Panel de controles ----
+  // ---- 5. Panel de controles: qué hace cada control ----
   crearInterfaz({
     capa(nombre, visible) {
       if (rutas) rutas.capas[nombre].visible = visible;
     },
     exageracion(valor) {
       terreno.aplicarExageracion(valor);
-      rutas?.reconstruir();                     // los tubos y pines se vuelven a pegar al suelo
+      rutas?.reconstruir();                     // tubos y pines se vuelven a apoyar en el nuevo relieve
       seleccion.refrescar();
-      recalcularSombras();                      // el relieve cambió: hay que recalcular sombras
+      recalcularSombras();
     },
     pausa(pausado) {
       if (recorrido) recorrido.estado.pausado = pausado;
-      opcionesRecorrido.pausado = pausado;
+      opcionesRecorrido.pausado = pausado;      // se conserva si se cambia de plan
     },
     velocidad(m_s) {
       if (recorrido) recorrido.estado.velocidad = m_s;
@@ -138,12 +139,12 @@ async function iniciar() {
       mostrarMetricas(datosRutas);
       if (rutas) rutas.reconstruir(datosRutas);
       else { rutas = crearRutas(terreno, datosRutas); scene.add(rutas.grupo); }
-      seleccion.refrescar();                    // el plan cambió: se cierra la ficha
+      seleccion.refrescar();
       if (rover) {
         recorrido = crearRecorrido(terreno, rover, datosRutas.plan, opcionesRecorrido);
         recorrido.estado.pausado = !!opcionesRecorrido.pausado;
       }
-      recalcularSombras();                      // los pines cambiaron de lugar
+      recalcularSombras();
     },
   });
 }

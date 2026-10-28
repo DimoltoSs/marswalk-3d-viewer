@@ -1,14 +1,14 @@
 /**
- * Panel de controles (el HTML está en index.html, aquí solo se conectan los eventos).
+ * Panel de controles. El HTML está en index.html; aquí solo se conectan los eventos.
  *
- * interfaz.js no sabe nada de Three.js: recibe un objeto "acciones" con funciones
- * y las llama cuando el usuario toca algo. Así main.js decide QUÉ hace cada control.
+ * No depende de Three.js: recibe un objeto `acciones` y llama a sus funciones cuando
+ * cambia un control. main.js define qué hace cada una.
  *
  * acciones = {
- *   capa(nombre, visible)   nombre: 'real' | 'plan' | 'objetivos'
+ *   capa(nombre, visible)   'real' | 'plan' | 'objetivos'
  *   exageracion(valor)      1..6
  *   pausa(pausado)          true / false
- *   velocidad(m_s)          m/s simulados por segundo real
+ *   velocidad(m_s)          m simulados por segundo real
  *   seguir(activo)          cámara que sigue al rover
  *   plan(archivo)           'rutas_v2.json' | 'rutas.json'
  *   capaTerreno(nombre)     'crism' | 'costo' | null
@@ -18,19 +18,19 @@
 export function crearInterfaz(acciones) {
   const $ = (id) => document.getElementById(id);
 
-  // ---- Capas: un checkbox por capa, con data-capa="real" etc. ----
+  // Capas de rutas: un checkbox por capa, identificado con data-capa
   for (const caja of document.querySelectorAll('[data-capa]')) {
     caja.addEventListener('change', () => acciones.capa(caja.dataset.capa, caja.checked));
   }
 
-  // ---- Exageración del relieve ----
+  // Exageración del relieve
   const exa = $('exageracion');
   exa.addEventListener('input', () => {
     $('exageracion-valor').textContent = `${exa.value}×`;
     acciones.exageracion(Number(exa.value));
   });
 
-  // ---- Capa sobre el terreno (CRISM / costos) ----
+  // Capa sobre el terreno (CRISM / costos)
   $('capa').addEventListener('change', (e) => acciones.capaTerreno(e.target.value || null));
   const opa = $('capa-opacidad');
   opa.addEventListener('input', () => {
@@ -38,7 +38,7 @@ export function crearInterfaz(acciones) {
     acciones.opacidadCapa(Number(opa.value));
   });
 
-  // ---- Rover: pausa y velocidad ----
+  // Rover: pausa, velocidad y cámara
   const botonPausa = $('pausa');
   let pausado = false;
   botonPausa.addEventListener('click', () => {
@@ -55,14 +55,14 @@ export function crearInterfaz(acciones) {
 
   $('seguir').addEventListener('change', (e) => acciones.seguir(e.target.checked));
 
-  // ---- Plan v1 / v2 ----
+  // Plan v1 / v2
   $('plan').addEventListener('change', (e) => acciones.plan(e.target.value));
 
-  // ---- Plegar / desplegar el panel ----
+  // Clic en el título: plegar / desplegar el panel
   $('panel-titulo').addEventListener('click', () => $('panel').classList.toggle('plegado'));
 }
 
-/** Muestra un aviso abajo de la pantalla (p. ej. si falta un archivo). Se acumulan. */
+/** Aviso en la parte inferior de la pantalla (p. ej. un archivo que falta). Se acumulan. */
 export function aviso(texto) {
   const caja = document.getElementById('avisos');
   const linea = document.createElement('div');

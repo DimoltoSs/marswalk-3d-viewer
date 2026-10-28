@@ -1,6 +1,8 @@
-"""exportar_rutas.py - Paso 5 del visor 3D.
-Corre el plan del prototipo 1 y guarda en JSON las rutas y los objetivos para el navegador.
-Coordenadas en metros locales: x = Este, y = Norte (centro del mapa = 0, 0)."""
+"""exportar_rutas.py - Exporta el plan v1 (prototipo_uno) a public/data/rutas.json.
+
+Ejecuta el flujo de proto1_plan_estrategico.py y guarda la ruta planeada, los objetivos
+y la ruta real de Perseverance. Coordenadas en metros locales: x = Este, y = Norte,
+centro del mapa = (0, 0). El plan v2 lo exporta el notebook planificador_v2."""
 import json
 import os
 import sys
@@ -8,7 +10,7 @@ import sys
 import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))                 # .../NASA_SAC/visor_3d
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))     # para importar tus módulos
+sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))     # módulos del prototipo 1
 SALIDA = os.path.join(AQUI, "public", "data", "rutas.json")
 
 from proto1_capas import cargar, rc_a_xy                           # noqa: E402
@@ -29,7 +31,7 @@ def a_xy(celdas):
 
 
 def sin_repetidos(xy, minimo_m=5.0):
-    """Quita puntos consecutivos casi iguales (el rover detenido): rompen las curvas 3D."""
+    """Quita puntos consecutivos casi iguales (rover detenido): deforman las curvas 3D del visor."""
     limpio = [xy[0]]
     for p in xy[1:]:
         if np.hypot(p[0] - limpio[-1][0], p[1] - limpio[-1][1]) > minimo_m:

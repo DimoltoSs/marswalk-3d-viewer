@@ -1,4 +1,6 @@
-"""exportas_terreno.py. Lee el DEM y la imagen CTX y los guardec en formatos que el navegador pueda leer. """
+"""exportar_terrenos.py - Convierte el DEM y la ortoimagen CTX a formatos para el navegador.
+
+Salida en public/data/: dem.bin (alturas float32, N x N), textura.jpg y meta.json."""
 import json
 import os
 import numpy as np
@@ -8,7 +10,7 @@ from PIL import Image
 AQUI = os.path.dirname(os.path.abspath(__file__))
 ENTRADA = os.path.join(AQUI, "..", "data", "processed")
 SALIDA = os.path.join(AQUI, "public", "data")
-N = 400
+N = 400   # vértices por lado: 400 x 400 = 160k, suficiente detalle y carga rápida
 
 def leer(name):
     """Lee la banda 1 de un GeoTIFF como float32, con NaN en los valores nulos."""
@@ -20,16 +22,17 @@ def leer(name):
 
 def exportar_dem():
     dem = leer("dem_ctx_20m.tif")
-    dem = np.where(np.isnan(dem), np.nanmin(dem), dem)  
+    dem = np.where(np.isnan(dem), np.nanmin(dem), dem)   # huecos sin dato -> altura mínima
     chico = Image.fromarray(dem).resize((N, N), Image.BILINEAR)
     chico = np.asarray(chico, dtype="<f4")
-    chico.tofile(os.path.join(SALIDA, "dem.bin"))
+    chico.tofile(os.path.join(SALIDA, "dem.bin"))       # binario little-endian: lo lee Float32Array
     return float(chico.min()), float(chico.max())
 
 def exportar_textura():
     img = leer("ortho_ctx_20m.tif")
-    lo, hi = np.percentile(img[img > 0], [1, 99])
+    lo, hi = np.percentile(img[img > 0], [1, 99])       # estirar el contraste (0 = sin dato)
     g = np.clip((img - lo) / (hi - lo), 0, 1)
+    # Gris -> tono marciano: cada canal con su propio rango de color
     rgb = np.stack([0.35 + 0.60 * g,
                     0.20 + 0.50 * g,
                     0.12 + 0.33 * g], axis=-1)

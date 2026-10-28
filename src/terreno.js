@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 
-// 1 unidad de la escena = 100 metros  ->  el mapa de 20 km mide 200 unidades
+// Escala de la escena: 1 unidad = 100 m (el mapa de 20 km mide 200 unidades).
 export const ESCALA_M = 100;
 
 /**
- * Carga dem.bin + meta.json y construye la malla 3D del terreno.
- * Devuelve la malla y funciones para usar el terreno desde otros módulos.
+ * Construye la malla 3D del terreno a partir de dem.bin + meta.json (exportar_terrenos.py).
+ * Devuelve la malla y utilidades para que otros módulos ubiquen cosas sobre el relieve.
  */
 export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
-  //  1. Leer los archivos que exportó Python 
+  // ---- 1. Datos ----
   const meta = await (await fetch('/data/meta.json')).json();
   const buffer = await (await fetch('/data/dem.bin')).arrayBuffer();
-  const elev = new Float32Array(buffer);          // n*n alturas en metros
+  const elev = new Float32Array(buffer);          // n × n alturas en metros, fila 0 = Norte
   const n = meta.n;
   if (elev.length !== n * n) {
     throw new Error(`dem.bin trae ${elev.length} valores, se esperaban ${n * n}`);
@@ -19,25 +19,24 @@ export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
 
   let suma = 0;
   for (const z of elev) suma += z;
-  const elevMedia = suma / elev.length;           // la altura media queda en y = 0
-  const lado = meta.extension_m / ESCALA_M;       // 200 unidades
+  const elevMedia = suma / elev.length;           // se usa como y = 0 para centrar el relieve
+  const lado = meta.extension_m / ESCALA_M;
 
-  // ---- 2. Vértices: uno por celda del DEM 
-  const posiciones = new Float32Array(n * n * 3); // x, y, z de cada vértice
-  const uvs = new Float32Array(n * n * 2);        // u, v: qué punto de la imagen va en cada vértice
-  for (let i = 0; i < n; i++) {                   // i = fila (0 = Norte)
-    for (let j = 0; j < n; j++) {                 // j = columna (0 = Oeste)
+  // ---- 2. Vértices y UV: uno por celda del DEM ----
+  const posiciones = new Float32Array(n * n * 3);
+  const uvs = new Float32Array(n * n * 2);
+  for (let i = 0; i < n; i++) {                   // fila: Norte -> Sur  (z de la escena)
+    for (let j = 0; j < n; j++) {                 // columna: Oeste -> Este (x de la escena)
       const k = i * n + j;
-      posiciones[k * 3] = -lado / 2 + (lado * j) / (n - 1);      // x: Oeste -> Este
-      posiciones[k * 3 + 2] = -lado / 2 + (lado * i) / (n - 1);  // z: Norte -> Sur
-      // la y (altura) se llena en aplicarExageracion()
-      uvs[k * 2] = j / (n - 1);                   // u: 0 (Oeste) -> 1 (Este)
-      uvs[k * 2 + 1] = 1 - i / (n - 1);           // v: 1 (Norte, arriba de la imagen) -> 0 (Sur)
+      posiciones[k * 3] = -lado / 2 + (lado * j) / (n - 1);
+      posiciones[k * 3 + 2] = -lado / 2 + (lado * i) / (n - 1);
+      // la altura (y) la pone aplicarExageracion()
+      uvs[k * 2] = j / (n - 1);
+      uvs[k * 2 + 1] = 1 - i / (n - 1);           // v = 1 arriba de la imagen = Norte
     }
   }
 
-  //  3. Triángulos: dos por cada cuadrito de 4 vértices 
-
+  // ---- 3. Triángulos: dos por cada cuadro de 4 vértices ----
   const indices = new Uint32Array((n - 1) * (n - 1) * 6);
   let t = 0;
   for (let i = 0; i < n - 1; i++) {
@@ -53,34 +52,34 @@ export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
   geometria.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometria.setIndex(new THREE.BufferAttribute(indices, 1));
 
-  //  4. Alturas (se puede volver a llamar para cambiar la exageración) 
+  // ---- 4. Alturas: se puede volver a llamar para cambiar la exageración en vivo ----
   function aplicarExageracion(ex) {
     exageracion = ex;
     for (let k = 0; k < n * n; k++) {
       posiciones[k * 3 + 1] = ((elev[k] - elevMedia) * ex) / ESCALA_M;
     }
     geometria.attributes.position.needsUpdate = true;
-    geometria.computeVertexNormals();   // normales = hacia dónde "mira" cada punto -> sombreado
+    geometria.computeVertexNormals();   // las normales definen el sombreado del relieve
     geometria.computeBoundingSphere();
   }
   aplicarExageracion(exageracion);
 
-// ---- 5. Textura CTX + material ----
+  // ---- 5. Textura CTX y material ----
   const textura = await new THREE.TextureLoader().loadAsync('/data/textura.jpg');
-  textura.colorSpace = THREE.SRGBColorSpace;      // la foto está en sRGB: sin esto se ve deslavada
-  textura.anisotropy = anisotropia;               // nitidez cuando se ve de lado
+  textura.colorSpace = THREE.SRGBColorSpace;      // sin esto la imagen se ve deslavada
+  textura.anisotropy = anisotropia;               // nitidez en vistas rasantes
 
   const material = new THREE.MeshStandardMaterial({
-    map: textura,      // la imagen CTX pintada sobre la malla
-    roughness: 1,      // superficie mate (polvo), sin brillos
+    map: textura,
+    roughness: 1,      // polvo mate, sin brillos
     metalness: 0,
   });
   const mesh = new THREE.Mesh(geometria, material);
-  mesh.castShadow = true;      // el relieve proyecta sombra...
-  mesh.receiveShadow = true;   // ...sobre sí mismo
+  mesh.castShadow = true;      // el relieve se sombrea a sí mismo
+  mesh.receiveShadow = true;
 
-  // ---- 6. Utilidades para otros módulos (rutas, rover) ----
-  /** Altura en metros en (x Este, y Norte) metros locales, con interpolación bilineal. */
+  // ---- 6. Utilidades para otros módulos ----
+  /** Altura en metros en (x Este, y Norte), con interpolación bilineal entre celdas. */
   function alturaEn(xm, ym) {
     const fx = ((xm + meta.extension_m / 2) / meta.extension_m) * (n - 1);
     const fy = ((meta.extension_m / 2 - ym) / meta.extension_m) * (n - 1);
@@ -92,7 +91,7 @@ export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
     return (z00 * (1 - tx) + z01 * tx) * (1 - ty) + (z10 * (1 - tx) + z11 * tx) * ty;
   }
 
-  /** Convierte metros locales (x Este, y Norte) a un punto de la escena sobre el terreno. */
+  /** Metros locales (x Este, y Norte) -> punto de la escena apoyado en el terreno. */
   function aEscena(xm, ym, sobreSuelo = 0) {
     const y = ((alturaEn(xm, ym) - elevMedia) * exageracion) / ESCALA_M;
     return new THREE.Vector3(xm / ESCALA_M, y + sobreSuelo, -ym / ESCALA_M);

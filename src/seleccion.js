@@ -1,30 +1,30 @@
 import * as THREE from 'three';
 
 /**
- * Clic sobre un pin de objetivo -> ficha con sus datos, pegada al pin en pantalla.
+ * Clic sobre un pin de objetivo -> ficha con sus datos, anclada al pin en pantalla.
  *
- * obtenerGrupo(): devuelve el grupo de pines (rutas.capas.objetivos). Es una función
- * y no el grupo directo porque las rutas se pueden cargar tarde o reconstruir.
- * Cada pin trae sus datos en pin.userData.objetivo (lo pone rutas.js).
+ * obtenerGrupo() devuelve el grupo de pines (rutas.capas.objetivos). Es una función
+ * porque las rutas pueden cargarse después o reconstruirse.
+ * Los datos de cada pin están en pin.userData.objetivo (los asigna rutas.js).
  */
 export function crearSeleccion(camera, canvas, obtenerGrupo) {
   const ficha = document.getElementById('ficha');
   const raycaster = new THREE.Raycaster();
   const raton = new THREE.Vector2();
   const arriba = new THREE.Vector3();
-  let elegido = null;          // pin seleccionado (o null)
+  let elegido = null;
 
   /** Pin bajo el ratón, o null. */
   function pinEn(evento) {
     const grupo = obtenerGrupo();
     if (!grupo || !grupo.visible) return null;
-    // Pasar de píxeles a coordenadas -1..1 que entiende el raycaster
+    // Píxeles -> coordenadas normalizadas (-1..1) que usa el raycaster
     const caja = canvas.getBoundingClientRect();
     raton.x = ((evento.clientX - caja.left) / caja.width) * 2 - 1;
     raton.y = -((evento.clientY - caja.top) / caja.height) * 2 + 1;
     raycaster.setFromCamera(raton, camera);
     const toque = raycaster.intersectObjects(grupo.children, true)[0];
-    // El rayo toca el cono o la esfera: subir hasta el grupo del pin, que tiene los datos
+    // El rayo toca el cono o la esfera: se sube hasta el grupo del pin, que guarda los datos
     let o = toque?.object;
     while (o && !o.userData.objetivo) o = o.parent;
     return o ?? null;
@@ -41,7 +41,7 @@ export function crearSeleccion(camera, canvas, obtenerGrupo) {
     if (!pin) { ficha.hidden = true; return; }
     resaltar(pin, true);
     const o = pin.userData.objetivo;
-    // v2 trae "ciencia" (0..1); v1 trae "puntaje"
+    // El plan v2 trae "ciencia" (0..1); el v1, "puntaje"
     const valor = o.ciencia !== undefined
       ? `<tr><td>Ciencia</td><td>${o.ciencia.toFixed(2)}</td></tr>`
       : `<tr><td>Puntaje</td><td>${o.puntaje}</td></tr>`;
@@ -55,25 +55,25 @@ export function crearSeleccion(camera, canvas, obtenerGrupo) {
     ficha.hidden = false;
   }
 
-  // Distinguir clic de arrastre: si el ratón se movió más de 5 px, era para girar la cámara
+  // Clic vs. arrastre: si el ratón se movió más de 5 px, se estaba girando la cámara
   let inicio = null;
   canvas.addEventListener('pointerdown', (e) => { inicio = [e.clientX, e.clientY]; });
   canvas.addEventListener('pointerup', (e) => {
     if (!inicio || Math.hypot(e.clientX - inicio[0], e.clientY - inicio[1]) > 5) return;
-    elegir(pinEn(e));                           // clic en el vacío = cerrar la ficha
+    elegir(pinEn(e));                           // clic fuera de un pin = cerrar la ficha
   });
-  // Manita al pasar sobre un pin
+  // Cursor de mano sobre los pines
   canvas.addEventListener('pointermove', (e) => {
-    if (e.buttons) return;                      // arrastrando: no molestar
+    if (e.buttons) return;                      // no mientras se arrastra
     canvas.style.cursor = pinEn(e) ? 'pointer' : '';
   });
 
-  /** Llamar en cada cuadro: mueve la ficha para que siga al pin. */
+  /** En cada cuadro: proyecta el pin a pantalla y mueve la ficha con él. */
   function actualizar() {
     if (!elegido) return;
     elegido.getWorldPosition(arriba);
-    arriba.y += 5.5;                            // un poco arriba de la bolita del pin
-    arriba.project(camera);                     // ahora x, y en -1..1 y z > 1 si está detrás
+    arriba.y += 5.5;                            // justo encima de la esfera del pin
+    arriba.project(camera);                     // x, y en -1..1; z > 1 = detrás de la cámara
     const visible = arriba.z < 1 && elegido.parent?.visible;
     ficha.style.display = visible ? '' : 'none';
     ficha.style.left = `${(arriba.x + 1) / 2 * canvas.clientWidth}px`;
@@ -81,9 +81,8 @@ export function crearSeleccion(camera, canvas, obtenerGrupo) {
   }
 
   /**
-   * Llamar después de rutas.reconstruir(): los pines viejos se borraron. Si el mismo
-   * objetivo sigue existiendo (p. ej. solo cambió la exageración) se vuelve a elegir;
-   * si no (se cambió de plan), se cierra la ficha.
+   * Tras rutas.reconstruir() los pines son nuevos. Si el mismo objetivo sigue existiendo
+   * (cambió solo la exageración) se vuelve a seleccionar; si cambió el plan, se cierra la ficha.
    */
   function refrescar() {
     const o = elegido?.userData.objetivo;

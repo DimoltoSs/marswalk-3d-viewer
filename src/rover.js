@@ -3,31 +3,27 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ESCALA_M } from './terreno.js';
 
 /**
- * Carga el modelo .glb de Perseverance y lo prepara:
- * centrado, con las ruedas en y = 0 y a la escala de la escena.
- * escalaVisual: cuántas veces más grande que el real (a escala real mide ~0.03 unidades: invisible).
+ * Carga el modelo de Perseverance (NASA/JPL), centrado y con las ruedas en y = 0.
+ * escalaVisual: factor de agrandamiento; a escala real mediría menos de un píxel.
  */
 export async function cargarRover({ url = '/modelos/perseverance.glb', escalaVisual = 60 } = {}) {
   const gltf = await new GLTFLoader().loadAsync(url);
-  const modelo = gltf.scene;                       // el modelo viene en metros, con y hacia arriba
+  const modelo = gltf.scene;                       // en metros, y hacia arriba
 
-  // Centrar el modelo y apoyar las ruedas en el suelo (y = 0)
   const caja = new THREE.Box3().setFromObject(modelo);
   const centro = caja.getCenter(new THREE.Vector3());
   modelo.position.set(-centro.x, -caja.min.y, -centro.z);
 
-  // Sin sombras en el rover: las sombras están "horneadas" (ver escena.js), así que una
-  // sombra del rover se quedaría congelada en el inicio. Además ahorra dibujar 200k
-  // triángulos extra en cada cuadro.
+  // Sin sombras: con el mapa de sombras precalculado, la sombra del rover se quedaría
+  // fija en el inicio. También evita dibujar sus ~200k triángulos una vez más por cuadro.
   modelo.traverse((o) => {
     if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; }
   });
 
-  // "Pivote": un grupo vacío que contiene al modelo. Movemos y giramos el pivote,
-  // y el modelo (ya centrado dentro) lo sigue sin desacomodarse.
+  // Pivote: se mueve y gira el grupo, y el modelo centrado dentro lo sigue.
   const rover = new THREE.Group();
   rover.add(modelo);
-  rover.scale.setScalar(escalaVisual / ESCALA_M); // metros -> unidades de escena, agrandado
+  rover.scale.setScalar(escalaVisual / ESCALA_M);
 
   const tamano = caja.getSize(new THREE.Vector3());
   console.log(`Rover cargado: ${tamano.x.toFixed(1)} x ${tamano.y.toFixed(1)} x ${tamano.z.toFixed(1)} m`);
@@ -35,12 +31,11 @@ export async function cargarRover({ url = '/modelos/perseverance.glb', escalaVis
 }
 
 /**
- * Hace que el rover recorra una ruta [[x, y], ...] en metros, siguiendo el terreno.
- * Devuelve { actualizar(dt), estado, largo }. En estado se puede cambiar
- * pausado (true/false) y velocidad (m/s simulados por segundo real) en vivo.
+ * Mueve el rover a lo largo de una ruta [[x, y], ...] en metros, pegado al terreno.
+ * estado.pausado y estado.velocidad (m simulados por segundo real) se pueden cambiar en vivo.
  */
 export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelanto_m = 150 } = {}) {
-  // Distancia acumulada en cada punto: permite ubicar "el punto a d metros del inicio"
+  // Distancia acumulada en cada punto, para ubicar "el punto a d metros del inicio"
   const acumulada = [0];
   for (let i = 1; i < xy.length; i++) {
     const [x0, y0] = xy[i - 1], [x1, y1] = xy[i];
@@ -48,7 +43,7 @@ export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelan
   }
   const largo = acumulada[acumulada.length - 1];
 
-  /** Punto (x, y) en metros a una distancia d a lo largo de la ruta (interpolando entre puntos). */
+  /** Punto (x, y) a d metros del inicio, interpolando entre los puntos de la ruta. */
   function puntoEn(d) {
     d = Math.min(Math.max(d, 0), largo);
     let i = 1;
@@ -62,15 +57,15 @@ export function crearRecorrido(terreno, rover, xy, { velocidad_m_s = 300, adelan
 
   function colocar() {
     const [x, y] = puntoEn(estado.distancia);
-    const [xa, ya] = puntoEn(estado.distancia + adelanto_m);   // un punto más adelante
+    const [xa, ya] = puntoEn(estado.distancia + adelanto_m);
     rover.position.copy(terreno.aEscena(x, y));
-    rover.lookAt(terreno.aEscena(xa, ya));                     // mira hacia allá (y se inclina en las subidas)
+    rover.lookAt(terreno.aEscena(xa, ya));                     // mirar un punto adelante: orienta e inclina en pendientes
   }
 
   function actualizar(dt) {
     if (!estado.pausado) {
       estado.distancia += estado.velocidad * dt;
-      if (estado.distancia > largo) estado.distancia = 0;      // al llegar, vuelve a empezar
+      if (estado.distancia > largo) estado.distancia = 0;      // reinicia al llegar a la meta
     }
     colocar();
   }
