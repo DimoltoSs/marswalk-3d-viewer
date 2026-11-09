@@ -20,7 +20,7 @@ def distancia_acumulada(camino, res=20.0):
     """Metros recorridos hasta cada celda del camino."""
     a = np.asanyarray(camino, dtype=float)
     pasos = res * np.hypot(*np.diff(a, axis=0).T)
-    return np.concatenate([[0,0], np.cumsum(pasos)])
+    return np.concatenate([[0.0], np.cumsum(pasos)])
 
 def replanear(costo, camino, i_robot, peligro, radio_m, margen_m=100.0, res=20.0):
     """El robot va en camino[i_robot] y detecta un peligro circular en ´peligro´ (fila, col)."""
