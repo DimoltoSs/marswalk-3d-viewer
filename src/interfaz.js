@@ -13,6 +13,7 @@
  *   plan(archivo)           'rutas_v2.json' | 'rutas.json'
  *   capaTerreno(nombre)     'crism' | 'costo' | null
  *   opacidadCapa(valor)     0.1..1
+ *   replaneo(activo)        simular un peligro y el desvío autónomo
  * }
  */
 export function crearInterfaz(acciones) {
@@ -54,6 +55,9 @@ export function crearInterfaz(acciones) {
   });
 
   $('seguir').addEventListener('change', (e) => acciones.seguir(e.target.checked));
+
+  // Navegación autónoma: peligro simulado
+  $('replaneo').addEventListener('change', (e) => acciones.replaneo(e.target.checked));
 
   // Plan v1 / v2
   $('plan').addEventListener('change', (e) => acciones.plan(e.target.value));

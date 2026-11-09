@@ -22,7 +22,7 @@ export async function cargarDatosRutas(archivo = 'rutas_v2.json') {
 }
 
 /** Tubo 3D que sigue una lista de puntos [x, y] en metros, apoyado en el terreno. */
-function crearTubo(terreno, xy, color, radio) {
+export function crearTubo(terreno, xy, color, radio) {
   const puntos = xy.map(([x, y]) => terreno.aEscena(x, y, radio + 0.1));
   const curva = new THREE.CatmullRomCurve3(puntos, false, 'centripetal');   // centrípeta: sin bucles en curvas cerradas
   const geometria = new THREE.TubeGeometry(curva, puntos.length * 4, radio, 8, false);
