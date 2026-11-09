@@ -6,9 +6,10 @@ import { cargarDatosRutas, crearRutas } from './rutas.js';
 import { cargarRover, crearRecorrido } from './rover.js';
 import { crearInterfaz, aviso } from './interfaz.js';
 import { crearSeleccion } from './seleccion.js';
-import { mostrarMetricas } from './metricas.js';
+import { mostrarMetricas, mostrarMetricasVivo } from './metricas.js';
 import { cargarCapas } from './capas.js';
 import { crearReplaneo } from './replaneo.js';
+import { crearPlanificador } from './planificador.js';
 
 async function iniciar() {
   const canvas = document.getElementById('lienzo');
@@ -26,9 +27,13 @@ async function iniciar() {
   // Cada parte se carga por separado: si una falla queda en null y el resto sigue funcionando.
   let terreno = null, rutas = null, rover = null, recorrido = null, capas = null;
   let replaneo = null, conReplaneo = false;   // peligro simulado y desvío autónomo
+  let planificador = null;                     // misión libre y EVA (servidor.py)
+  let modo = 'rutas_v2.json';                  // valor del selector de misión
+  const esVivo = () => modo === 'libre' || modo === 'eva';
   let seguir = false;
   const opcionesRecorrido = { velocidad_m_s: 300 };
-  const seleccion = crearSeleccion(camera, canvas, () => rutas?.capas.objetivos);
+  const seleccion = crearSeleccion(camera, canvas,
+    () => (esVivo() ? planificador?.capas.objetivos : rutas?.capas.objetivos));
 
   // ---- Bucle de animación: arranca antes de cargar los datos ----
   const delta = new THREE.Vector3();
@@ -107,25 +112,70 @@ async function iniciar() {
     document.getElementById('replaneo').disabled = true;
   }
 
-  /** (Re)inicia el rover: con replaneo sigue el plan con desvío; sin él, el plan original. */
-  function arrancarRecorrido() {
-    if (!rover || !datosRutas) return;
-    const camino = conReplaneo ? replaneo.plan : datosRutas.plan;
-    recorrido = crearRecorrido(terreno, rover, camino, opcionesRecorrido);
-    recorrido.estado.pausado = !!opcionesRecorrido.pausado;
+  /** (Re)inicia el rover sobre `camino` (null = sin ruta: se oculta).
+   *  Por defecto: en vivo, nada hasta que haya ruta; si no, el plan con desvío o el original. */
+  function arrancarRecorrido(camino = esVivo() ? null : (conReplaneo ? replaneo.plan : datosRutas?.plan)) {
+    if (!rover) return;
+    rover.visible = !!camino;
+    recorrido = camino ? crearRecorrido(terreno, rover, camino, opcionesRecorrido) : null;
+    if (recorrido) recorrido.estado.pausado = !!opcionesRecorrido.pausado;
   }
+
+  /** Apaga el peligro simulado y su casilla. */
+  function apagarReplaneo() {
+    document.getElementById('replaneo').checked = false;
+    conReplaneo = false;
+    if (replaneo) replaneo.grupo.visible = false;
+    document.getElementById('replaneo-info').textContent = 'Solo con el plan v2.';
+  }
+
+  /** Qué se ve: las casillas de "Capas" aplican a la misión activa (precalculada o en vivo). */
+  const casilla = (nombre) => document.querySelector(`[data-capa="${nombre}"]`).checked;
+  function aplicarCapas() {
+    const vivo = esVivo();
+    if (rutas) {
+      rutas.capas.real.visible = casilla('real');
+      rutas.capas.plan.visible = !vivo && casilla('plan');
+      rutas.capas.objetivos.visible = !vivo && casilla('objetivos');
+    }
+    planificador.grupo.visible = vivo;
+    planificador.capas.plan.visible = casilla('plan');
+    planificador.capas.objetivos.visible = casilla('objetivos');
+  }
+
+  /** Secciones del panel que solo aplican a ciertos modos (atributo data-modos en index.html). */
+  function mostrarSecciones() {
+    for (const s of document.querySelectorAll('[data-modos]')) {
+      s.hidden = !s.dataset.modos.split(' ').includes(modo);
+    }
+  }
+
+  // ---- 4c. Planificador en vivo (necesita servidor.py) ----
+  planificador = crearPlanificador(terreno, camera, canvas, {
+    alCambiar(resultado) {                      // hay ruta nueva, o se borró
+      if (!esVivo()) return;
+      mostrarMetricasVivo(modo, resultado);
+      arrancarRecorrido(resultado?.plan ?? null);
+      seleccion.refrescar();
+      recalcularSombras();
+    },
+  });
+  scene.add(planificador.grupo);
+  mostrarSecciones();
+  aplicarCapas();
 
   recalcularSombras();                          // ahora con rutas y pines
 
   // ---- 5. Panel de controles: qué hace cada control ----
   crearInterfaz({
-    capa(nombre, visible) {
-      if (rutas) rutas.capas[nombre].visible = visible;
+    capa() {
+      aplicarCapas();
     },
     exageracion(valor) {
       terreno.aplicarExageracion(valor);
       rutas?.reconstruir();                     // tubos y pines se vuelven a apoyar en el nuevo relieve
       replaneo?.reconstruir();
+      planificador.reconstruir();
       seleccion.refrescar();
       recalcularSombras();
     },
@@ -157,27 +207,27 @@ async function iniciar() {
         ? 'Siguiendo el plan enviado desde la Tierra…' : 'Solo con el plan v2.';
       arrancarRecorrido();                      // el rover vuelve al inicio para ver la detección
     },
-    async plan(archivo) {
-      try {
-        datosRutas = await cargarDatosRutas(archivo);
-      } catch (err) {
-        aviso(err.message);
-        return;
+    async plan(valor) {
+      modo = valor;
+      mostrarSecciones();
+      if (modo !== 'rutas_v2.json') apagarReplaneo();   // el peligro simulado es sobre el plan v2
+      if (esVivo()) {
+        planificador.cambiarModo(modo);         // mapa limpio, a esperar clics
+      } else {
+        planificador.cambiarModo(null);
+        try {
+          datosRutas = await cargarDatosRutas(modo);
+        } catch (err) {
+          aviso(err.message);
+          return;
+        }
+        mostrarMetricas(datosRutas);
+        if (rutas) rutas.reconstruir(datosRutas);
+        else { rutas = crearRutas(terreno, datosRutas); scene.add(rutas.grupo); }
+        arrancarRecorrido();
       }
-      mostrarMetricas(datosRutas);
-      if (rutas) rutas.reconstruir(datosRutas);
-      else { rutas = crearRutas(terreno, datosRutas); scene.add(rutas.grupo); }
+      aplicarCapas();
       seleccion.refrescar();
-      // El replaneo se calculó sobre el plan v2: con otro plan se apaga
-      const caja = document.getElementById('replaneo');
-      caja.disabled = !replaneo || archivo !== 'rutas_v2.json';
-      if (caja.disabled && conReplaneo) {
-        caja.checked = false;
-        conReplaneo = false;
-        replaneo.grupo.visible = false;
-        document.getElementById('replaneo-info').textContent = 'Solo con el plan v2.';
-      }
-      arrancarRecorrido();
       recalcularSombras();
     },
   });

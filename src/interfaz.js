@@ -10,7 +10,7 @@
  *   pausa(pausado)          true / false
  *   velocidad(m_s)          m simulados por segundo real
  *   seguir(activo)          cámara que sigue al rover
- *   plan(archivo)           'rutas_v2.json' | 'rutas.json'
+ *   plan(valor)             'rutas_v2.json' | 'rutas.json' | 'libre' | 'eva'
  *   capaTerreno(nombre)     'crism' | 'costo' | null
  *   opacidadCapa(valor)     0.1..1
  *   replaneo(activo)        simular un peligro y el desvío autónomo
@@ -59,7 +59,7 @@ export function crearInterfaz(acciones) {
   // Navegación autónoma: peligro simulado
   $('replaneo').addEventListener('change', (e) => acciones.replaneo(e.target.checked));
 
-  // Plan v1 / v2
+  // Misión: v2 / v1 (precalculadas), libre / EVA (en vivo)
   $('plan').addEventListener('change', (e) => acciones.plan(e.target.value));
 
   // Clic en el título: plegar / desplegar el panel

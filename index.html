@@ -16,6 +16,7 @@
       border-radius: 8px; padding: 10px 12px;
       backdrop-filter: blur(4px);
       user-select: none;
+      max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
     }
     #panel-titulo { margin: 0; font-size: 14px; cursor: pointer; }
     #panel-titulo::after { content: ' ▾'; opacity: 0.6; }
@@ -33,6 +34,7 @@
       background: #4a3428; color: inherit; border: 1px solid #6b4a3a; border-radius: 4px;
       font: inherit; cursor: pointer;
     }
+    .botones { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
     .muestra { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
     .valor { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -106,10 +108,12 @@
     <h2 id="panel-titulo">Jezero · Marswalk</h2>
 
     <div class="seccion">
-      <h3>Plan</h3>
+      <h3>Misión</h3>
       <select id="plan">
         <option value="rutas_v2.json">v2 · misión del notebook</option>
         <option value="rutas.json">v1 · prototipo_uno</option>
+        <option value="libre">Misión libre · A → B</option>
+        <option value="eva">EVA del astronauta · 3 km</option>
       </select>
     </div>
 
@@ -152,12 +156,22 @@
       <button id="pausa">⏸ Pausa</button>
     </div>
 
-    <div class="seccion">
+    <div class="seccion" data-modos="rutas_v2.json">
       <h3>Navegación autónoma</h3>
       <label><input type="checkbox" id="replaneo"> Simular peligro en la ruta</label>
       <label><span class="muestra" style="background:#ff8c1a"></span> Peligro
         <span class="muestra" style="background:#2ee6ff"></span> Desvío</label>
       <p class="nota" id="replaneo-info">Solo con el plan v2.</p>
+    </div>
+
+    <div class="seccion" data-modos="libre eva" hidden>
+      <h3>Planificador en vivo</h3>
+      <p class="nota" id="vivo-ayuda"></p>
+      <div class="botones">
+        <button id="vivo-auto">Puntos aleatorios</button>
+        <button id="vivo-limpiar">Limpiar</button>
+      </div>
+      <p class="nota" id="vivo-info"></p>
     </div>
   </div>
 

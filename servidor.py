@@ -15,8 +15,8 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
 from proto1_capas import cargar, rc_a_xy, xy_a_rc            # noqa: E402
 from proto1_mapa_costos import construir_costo               # noqa: E402
-from proto1_objetivos import candidatos_ciencia              # noqa: E402
-from proto1_planificador import planear_mision               # noqa: E402
+from proto1_objetivos import candidatos_ciencia, elegir_objetivos  # noqa: E402
+from proto1_planificador import matriz_costos, planear_mision  # noqa: E402
 from eva import ESFUERZO_MAX, RADIO_M, distancia_a, mejor_centroide, planear_eva  # noqa: E402
 from replaneo import distancia_acumulada                     # noqa: E402
 
@@ -24,6 +24,7 @@ NOMBRES = {1: "Olivine", 2: "Mg-Carbonate", 3: "Fe/Mg-Smectite", 4: "Olivine+Sme
            5: "Olv.Smect+2.2um", 6: "Carb.+2.2um", 7: "High-Ca Pyroxene",
            8: "Low-Ca Pyroxene", 9: "Kaolinite", 10: "Mg-Smectite 2"}
 AJUSTE_MAX_M = 300.0    # si un punto cae en obstaculo, se mueve a la celda libre mas cercana
+MAX_CANDIDATOS = 12     # candidatos que entran a la matriz de costos de la mision libre
 
 # ---- Se carga una vez al arrancar (tarda unos segundos) ----
 L = cargar()
@@ -74,6 +75,17 @@ def a_celda(x, y, avisos):
     return celda
 
 
+def objetivos_json(visitados):
+    """Candidatos visitados -> lista para el visor (misma forma que rutas.json)."""
+    salida = []
+    for paso, v in enumerate(visitados, start=1):
+        x, y = a_xy([v["celda"]])[0]
+        salida.append({"parada": paso, "x": x, "y": y,
+                       "mineral": NOMBRES.get(v["mineral"], str(v["mineral"])),
+                       "area_ha": round(v["area_ha"], 1), "puntaje": round(v["puntaje"])})
+    return salida
+
+
 def resumen_mision(mision):
     camino = mision["camino"]
     return {"plan": a_xy(camino), "waypoints": a_xy(mision["waypoints"]),
@@ -84,6 +96,12 @@ def resumen_mision(mision):
 # Peticiones
 class PedidoRuta(BaseModel):
     puntos: list[tuple[float, float]] = Field(min_length=2, max_length=10)  # [[x, y], ...] m
+
+
+class PedidoLibre(BaseModel):
+    inicio: tuple[float, float]                         # A [x, y] m
+    fin: tuple[float, float]                            # B [x, y] m
+    factor: float = Field(1.5, ge=1.0, le=3.0)          # presupuesto = factor x costo directo
 
 
 class PedidoEva(BaseModel):
@@ -107,6 +125,39 @@ def ruta(p: PedidoRuta):
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     return {**resumen_mision(mision), "puntos": a_xy(celdas), "avisos": avisos}
+
+
+@app.post("/api/libre")
+def libre(p: PedidoLibre):
+    """Mision libre A -> B: la ruta segura que pasa por la mayor ciencia sin pasarse del presupuesto
+    (el mismo flujo que proto1_plan_estrategico.py, con A y B elegidos en el visor)."""
+    avisos = []
+    a = a_celda(*p.inicio, avisos)
+    b = a_celda(*p.fin, avisos)
+    if a == b:
+        raise HTTPException(422, "El inicio y el final caen en la misma celda.")
+
+    # Solo candidatos dentro de la elipse d(A,c) + d(c,B) <= factor * d(A,B), en linea recta:
+    # los demas no caben en el presupuesto (el costo por metro casi nunca baja de 1).
+    d_ab = 20.0 * np.hypot(a[0] - b[0], a[1] - b[1])
+    def dentro(c):
+        f, k = c["celda"]
+        return 20.0 * (np.hypot(f - a[0], k - a[1]) + np.hypot(f - b[0], k - b[1])) <= p.factor * d_ab
+    cerca = [c for c in CANDIDATOS if dentro(c)][:MAX_CANDIDATOS]   # ya vienen por puntaje
+
+    nodos = [a, b] + [c["celda"] for c in cerca]
+    M = matriz_costos(COSTO, nodos)
+    if not np.isfinite(M[0, 1]):
+        raise HTTPException(422, "No hay camino seguro entre A y B (pendientes de 20° o mas).")
+    puntajes = [c["puntaje"] if np.isfinite(M[0, k + 2]) and np.isfinite(M[k + 2, 1]) else 0.0
+                for k, c in enumerate(cerca)]
+    M = np.where(np.isfinite(M), M, 1e12)                    # inalcanzable = carisimo
+    orden, _, presupuesto = elegir_objetivos(M, puntajes, p.factor)
+    mision = planear_mision(COSTO, [nodos[k] for k in orden])
+    return {**resumen_mision(mision), "inicio": a_xy([a])[0], "fin": a_xy([b])[0],
+            "objetivos": objetivos_json([cerca[k - 2] for k in orden[1:-1]]),
+            "presupuesto": round(presupuesto), "costo_directo": round(float(M[0, 1])),
+            "candidatos": len(cerca), "avisos": avisos}
 
 
 @app.get("/api/aleatorios")
@@ -141,9 +192,5 @@ def eva(p: PedidoEva):
     datos["esfuerzo"] = round(r["costo"])
     datos["max_alejamiento_m"] = round(max(20 * np.hypot(f - habitat[0], c - habitat[1])
                                            for f, c in camino))
-    for paso, v in enumerate(r["visitados"], start=1):
-        x, y = a_xy([v["celda"]])[0]
-        datos["objetivos"].append({"parada": paso, "x": x, "y": y,
-                                   "mineral": NOMBRES.get(v["mineral"], str(v["mineral"])),
-                                   "area_ha": round(v["area_ha"], 1), "puntaje": round(v["puntaje"])})
+    datos["objetivos"] = objetivos_json(r["visitados"])
     return datos

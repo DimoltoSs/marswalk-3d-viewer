@@ -30,7 +30,7 @@ export function crearTubo(terreno, xy, color, radio) {
 }
 
 /** Marcador tipo pin (cono invertido + esfera) en (x, y) metros. */
-function crearPin(terreno, x, y, color, alto = 3) {
+export function crearPin(terreno, x, y, color, alto = 3) {
   const pin = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
   const cono = new THREE.Mesh(new THREE.ConeGeometry(0.5, alto, 12), material);

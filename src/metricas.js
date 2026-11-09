@@ -104,3 +104,42 @@ export function mostrarMetricas(datos) {
   }
   caja.innerHTML = html;
 }
+
+/** Panel para la misión libre (A → B) o la EVA, calculadas en vivo por servidor.py. */
+export function mostrarMetricasVivo(modo, r) {
+  const caja = document.getElementById('metricas-contenido');
+  const eva = modo === 'eva';
+  const titulo = eva ? 'EVA del astronauta · 3 km' : 'Misión libre · A → B';
+  if (!r || !r.plan) {
+    const pista = eva ? 'Haz clic en el terreno para poner el hábitat.'
+      : 'Haz clic en el terreno para poner el inicio (A) y luego el final (B).';
+    caja.innerHTML = `<div class="seccion"><h3>${titulo}</h3><p class="nota">${pista}</p></div>`;
+    return;
+  }
+
+  const ciencia = r.objetivos.reduce((suma, o) => suma + o.puntaje, 0);
+  const presupuesto = eva
+    ? `${barra('Esfuerzo', r.esfuerzo, r.esfuerzo_max, '')}
+       ${barra('Alejamiento máx.', r.max_alejamiento_m, r.radio_m, 'm')}
+       <p class="nota">Esfuerzo = costo del mapa (1 ≈ 1 m en plano). Ida y vuelta al hábitat.</p>`
+    : `${barra('Costo', r.costo, r.presupuesto, '')}
+       <p class="nota">Ruta directa A → B: costo ${fmt(r.costo_directo)}. El presupuesto es 1.5 × directo:
+       el extra se gasta en pasar por minerales. ${r.candidatos} candidatos considerados.</p>`;
+  const filas = r.objetivos.map((o) =>
+    `<tr><td>${o.parada}. ${o.mineral}</td><td>${fmt(o.area_ha, 1)} ha</td><td>${fmt(o.puntaje)}</td></tr>`).join('');
+
+  caja.innerHTML = `
+    <div class="seccion"><h3>${titulo}</h3>
+      <div class="kpi-grande">
+        <div><b>${r.objetivos.length}</b><span>objetivos</span></div>
+        <div><b>${fmt(r.km, 2)}</b><span>km</span></div>
+        <div><b>${fmt(ciencia)}</b><span>ciencia</span></div>
+      </div>
+      ${presupuesto}
+    </div>
+    <div class="seccion"><h3>Objetivos en orden</h3>
+      ${filas ? `<table class="vs"><tr><th></th><th>Área</th><th>Puntaje</th></tr>${filas}</table>`
+              : '<p class="nota">Ninguno cabe en el presupuesto: ruta directa.</p>'}
+      <p class="nota">${r.waypoints.length} waypoints. Pendiente ≥ 20° = obstáculo.</p>
+    </div>`;
+}
