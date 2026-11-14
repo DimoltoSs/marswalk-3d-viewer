@@ -13,6 +13,9 @@ import { ESCALA_M } from './terreno.js';
  *             Otro clic mueve el hábitat y se recalcula todo.
  * Arrastrar sigue moviendo la vista: solo cuenta como clic si el ratón casi no se movió.
  *
+ * El servidor (planificador v3) devuelve el frente de Pareto completo y cuatro misiones con nombre.
+ * El selector "Prioridad" cambia de misión sin volver a calcular.
+ *
  * avisos.alCambiar(resultado | null): main.js actualiza el rover y las métricas.
  */
 const COLORES = {
@@ -21,13 +24,29 @@ const COLORES = {
   habitat: 0x4da3ff,   // hábitat del astronauta y su radio
   ruta: 0xff3b3b,      // mismo rojo que "Nuestro plan"
   objetivo: 0xffd23f,  // mismo amarillo que "Objetivos"
+  o2Sobra: 0x3ddc84,   // EVA: % del tanque que quedaría al volver desde ese punto: > 25 %
+  o2Justo: 0xffd23f,   //       15-25 %
+  o2Poco: 0xff3b3b,    //       10-15 % (menos de 10 % = misión descartada por el servidor)
+  intenso: 0xb45cff,   // EVA: tramos de más de 85 L/h de O2
+  critico: 0xff8c1a,   // EVA: punto desde donde volver cuesta más O2
 };
+
+/** Tramos seguidos del mismo valor: [[valor, desde, hasta], ...] (índices de puntos, inclusivos). */
+function tramosIguales(valores) {
+  const tramos = [];
+  valores.forEach((v, i) => {
+    const ultimo = tramos[tramos.length - 1];
+    if (ultimo && ultimo[0] === v) ultimo[2] = i + 1;
+    else tramos.push([v, i, i + 1]);
+  });
+  return tramos;
+}
 const RADIO_EVA_M = 3000;
 const AYUDA = {
-  libre: 'Clic 1 = inicio (A), clic 2 = final (B): se calcula la ruta segura que pasa por más '
-    + 'minerales. Un 3.er clic empieza de nuevo. Arrastrar = mover la vista.',
-  eva: 'Un clic = hábitat del astronauta: aparece el radio de 3 km y la mejor salida de ida y '
-    + 'vuelta. Otro clic lo mueve. Arrastrar = mover la vista.',
+  libre: 'Robot: clic 1 = inicio (A), clic 2 = final (B). Se calcula la ruta que pasa por más '
+    + 'minerales sin agotar la batería. Un 3.er clic empieza de nuevo. Arrastrar = mover la vista.',
+  eva: 'Astronautas: un clic = hábitat. Aparece el radio de 3 km y la mejor salida de ida y vuelta '
+    + 'que cabe en el oxígeno del traje y en 8 h. Otro clic lo mueve. Arrastrar = mover la vista.',
 };
 const BOTON_AUTO = { libre: 'Puntos aleatorios', eva: 'Mejor centroide' };
 
@@ -66,7 +85,8 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
 
   let modo = null;        // 'libre' | 'eva' | null (misión precalculada)
   let puntos = [];        // [[x, y], ...] en metros: [A, B] o [hábitat]
-  let resultado = null;   // última respuesta del servidor
+  let resultado = null;   // última respuesta del servidor (con la misión de la prioridad elegida arriba)
+  let prioridad = 'equilibrada';
   let peticion = 0;       // cada clic nuevo invalida las respuestas que vengan en camino
 
   // ---- Dibujo ----
@@ -83,7 +103,8 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
       capas.marcas.add(crearPin(terreno, hx, hy, COLORES.habitat, 5));
       capas.marcas.add(crearTubo(terreno, puntosCirculo(hx, hy, RADIO_EVA_M), COLORES.habitat, 0.15));
     }
-    if (resultado?.plan) capas.plan.add(crearTubo(terreno, resultado.plan, COLORES.ruta, 0.25));
+    if (resultado?.plan && modo === 'eva' && resultado.tanque_pct) dibujarEva(resultado);
+    else if (resultado?.plan) capas.plan.add(crearTubo(terreno, resultado.plan, COLORES.ruta, 0.25));
     for (const o of resultado?.objetivos ?? []) {
       const pin = crearPin(terreno, o.x, o.y, COLORES.objetivo, 4);
       pin.userData.objetivo = o;                // para la ficha al hacer clic (seleccion.js)
@@ -91,7 +112,23 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
     }
   }
 
+  /** EVA: la ruta se colorea por el margen de O2 para volver; encima, los tramos de esfuerzo alto. */
+  function dibujarEva(r) {
+    const nivel = r.tanque_pct.slice(0, -1).map((p) => (
+      p > 25 ? COLORES.o2Sobra : p >= 15 ? COLORES.o2Justo : COLORES.o2Poco));
+    for (const [color, i, j] of tramosIguales(nivel)) {
+      capas.plan.add(crearTubo(terreno, r.plan.slice(i, j + 1), color, 0.25));
+    }
+    const intenso = r.intensidad_Lh.map((v) => v > (resultado.intensidad_max_ok_Lh ?? 85));
+    for (const [es, i, j] of tramosIguales(intenso)) {
+      if (es) capas.plan.add(crearTubo(terreno, r.plan.slice(i, j + 1), COLORES.intenso, 0.32));
+    }
+    const c = r.plan[r.punto_critico];
+    if (c) capas.plan.add(crearPin(terreno, c[0], c[1], COLORES.critico, 3));
+  }
+
   const estado = (texto) => { $('vivo-info').textContent = texto; };
+  const o2Traje = () => Number($('vivo-o2').value);
 
   /** Pide la ruta del modo actual y la dibuja (si nadie hizo otro clic mientras tanto). */
   async function calcular() {
@@ -99,8 +136,9 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
     estado('Calculando…');
     try {
       const r = modo === 'eva'
-        ? await api('eva', puntos.length ? { habitat: puntos[0] } : {})
-        : await api('libre', { inicio: puntos[0], fin: puntos[1] });
+        ? await api('eva', puntos.length ? { habitat: puntos[0], prioridad, o2_L: o2Traje() }
+          : { prioridad, o2_L: o2Traje() })
+        : await api('libre', { inicio: puntos[0], fin: puntos[1], prioridad });
       if (id !== peticion) return;              // llegó tarde: ya hay un clic más nuevo
       resultado = r;
       puntos = modo === 'eva' ? [r.habitat] : [r.inicio, r.fin];   // pueden venir ajustados
@@ -111,6 +149,21 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
       if (id === peticion) estado(`⚠ ${err.message}`);
     }
   }
+
+  /** Cambia a otra misión del frente ya calculado (ciencia, rápida, segura o equilibrada). */
+  function aplicarPrioridad(nombre) {
+    prioridad = nombre;
+    const i = resultado?.nombradas?.[nombre];
+    if (i === undefined) return;
+    resultado = { ...resultado, ...resultado.frente[i], prioridad: nombre };
+    dibujar();
+    avisos.alCambiar(resultado);
+  }
+  $('vivo-prioridad').addEventListener('change', (e) => aplicarPrioridad(e.target.value));
+
+  // O2 del traje: cambia el presupuesto de la EVA -> hay que volver a calcular
+  $('vivo-o2').addEventListener('input', (e) => { $('vivo-o2-valor').textContent = `${e.target.value} L`; });
+  $('vivo-o2').addEventListener('change', () => { if (modo === 'eva' && puntos.length) calcular(); });
 
   function nuevoPunto(xy) {
     if (modo === 'eva') puntos = [xy];

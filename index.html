@@ -111,9 +111,10 @@
       <h3>Misión</h3>
       <select id="plan">
         <option value="rutas_v2.json">v2 · misión del notebook</option>
+        <option value="rutas_v3.json">v3 · genético mejorado</option>
         <option value="rutas.json">v1 · prototipo_uno</option>
-        <option value="libre">Misión libre · A → B</option>
-        <option value="eva">EVA del astronauta · 3 km</option>
+        <option value="libre">Misión del robot · A → B</option>
+        <option value="eva">EVA de astronautas · 3 km</option>
       </select>
     </div>
 
@@ -167,11 +168,31 @@
     <div class="seccion" data-modos="libre eva" hidden>
       <h3>Planificador en vivo</h3>
       <p class="nota" id="vivo-ayuda"></p>
+      <label>Prioridad
+        <select id="vivo-prioridad">
+          <option value="equilibrada">Equilibrada</option>
+          <option value="ciencia">Más ciencia</option>
+          <option value="rapida">Más rápida</option>
+          <option value="segura">Más segura</option>
+        </select></label>
       <div class="botones">
         <button id="vivo-auto">Puntos aleatorios</button>
         <button id="vivo-limpiar">Limpiar</button>
       </div>
       <p class="nota" id="vivo-info"></p>
+    </div>
+
+    <div class="seccion" data-modos="eva" hidden>
+      <h3>Traje</h3>
+      <label>O₂ del traje
+        <input type="range" id="vivo-o2" min="100" max="600" step="10" value="380">
+        <span class="valor" id="vivo-o2-valor">380 L</span></label>
+      <p class="nota">380 L ≈ tanque principal del traje EMU de la NASA (8 h). Se guarda 10 % de reserva.</p>
+      <label><span class="muestra" style="background:#3ddc84"></span> &gt;25 %
+        <span class="muestra" style="background:#ffd23f"></span> 15–25 %
+        <span class="muestra" style="background:#ff3b3b"></span> 10–15 % de O₂</label>
+      <label><span class="muestra" style="background:#b45cff"></span> esfuerzo alto
+        <span class="muestra" style="background:#ff8c1a"></span> punto más comprometido</label>
     </div>
   </div>
 

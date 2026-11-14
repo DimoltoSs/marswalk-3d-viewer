@@ -6,6 +6,7 @@ Pillow
 # exportar_rutas.py importa el planificador de ../prototipo_uno, que además usa:
 scipy
 scikit-image
-# servidor.py (API local para el visor):
+# servidor.py (API local para el visor) y el planificador v3 (mision_v3.py):
 fastapi
 uvicorn
+pymoo
