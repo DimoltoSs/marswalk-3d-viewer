@@ -4,11 +4,14 @@ Carga el mapa de costos una sola vez y responde rutas con A*.
 Las misiones libre (A -> B) y EVA usan el planificador v3 + Marswalk v4 (mision_v3.py): arena de Séítah,
 pendiente HiRISE, un mapa por agente y astronauta con modelo metabólico (oxígeno). Devuelven el frente de Pareto completo y cuatro
 misiones con nombre (ciencia, rápida, segura, equilibrada) para elegir en el visor.
+Varios lugares (sitios.py): cada petición lleva ?sitio=jezero|gale; todos usan el mismo modelo y los mismos scripts.
 Arrancar (desde visor_3d):  python -m uvicorn servidor:app --port 8000
 Probar a mano:              http://localhost:8000/docs
 """
 import os
 import sys
+from functools import lru_cache
+from types import SimpleNamespace
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -16,12 +19,13 @@ from pydantic import BaseModel, Field
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
-from proto1_capas import cargar, rc_a_xy, xy_a_rc            # noqa: E402
+from proto1_capas import rc_a_xy, xy_a_rc                    # noqa: E402
 from proto1_mapa_costos import construir_costo               # noqa: E402
 from proto1_planificador import planear_mision              # noqa: E402
 from eva import RADIO_M, distancia_a, mejor_centroide         # noqa: E402
 from replaneo import distancia_acumulada                     # noqa: E402
 import mision_v3 as v3                                       # noqa: E402
+import sitios                                                # noqa: E402
 
 AJUSTE_MAX_M = 300.0    # si un punto cae en obstaculo, se mueve a la celda libre mas cercana
 MAX_CANDIDATOS = 15     # candidatos que entran a la matriz de tramos de una mision
@@ -33,15 +37,29 @@ HOLGADO_O2 = 0.25       # > 25 % = "de sobra" (verde); entre 15 y 25 % = "justo"
 INTENSIDAD_MAX_LH = 85  # ~1600 BTU/h: maximo que el EMU alcanza a enfriar; arriba de eso, tramo marcado
 PRIORIDADES = ("equilibrada", "ciencia", "rapida", "segura")
 
-# ---- Se carga una vez al arrancar (tarda unos segundos) ----
-L = cargar()
-COSTO = construir_costo(L)["costo"]
-# Marswalk v4: un mapa por agente. Rover: riesgo >= 15°, bloqueo >= 30° (P_ROVER). Astronauta: 10° y 20° (P).
-# Ambos incluyen la arena de Séítah (textura HiRISE) y la pendiente fina HiRISE.
-MAPAS = {"rover": v3.Mapa.desde_capas(L, p=v3.parametros(v3.ROVER)),
-         "astronauta": v3.Mapa.desde_capas(L, p=v3.parametros(v3.ASTRONAUTA))}
-CANDIDATOS = {k: v3.candidatos_ciencia(m, L) for k, m in MAPAS.items()}
-MAPA, CANDIDATOS_V3 = MAPAS["rover"], CANDIDATOS["rover"]    # nombres de antes (rover)
+# ---- Cada sitio se carga una vez, la primera vez que se pide (tarda unos segundos) ----
+@lru_cache(maxsize=None)
+def _cargar_sitio(nombre):
+    L = sitios.cargar(nombre)
+    # Marswalk v4: un mapa por agente. Rover: riesgo >= 15°, bloqueo >= 30° (P_ROVER). Astronauta: 10° y 20° (P).
+    # Ambos incluyen la arena (textura HiRISE) y, donde existe, la pendiente fina HiRISE.
+    mapas = {"rover": v3.Mapa.desde_capas(L, p=v3.parametros(v3.ROVER)),
+             "astronauta": v3.Mapa.desde_capas(L, p=v3.parametros(v3.ASTRONAUTA))}
+    # Mapa de A* (/api/ruta y puntos aleatorios): en Jezero el de prototipo_uno; en los demás, el del rover v4.
+    costo = construir_costo(L)["costo"] if nombre == "jezero" else mapas["rover"].costo
+    ruta = L.get("ruta_rc")
+    centro = tuple(int(v) for v in ruta[0]) if ruta is not None and len(ruta) else (costo.shape[0] // 2, costo.shape[1] // 2)
+    return SimpleNamespace(nombre=nombre, L=L, costo=costo, mapas=mapas, centro=centro,
+                           candidatos={k: v3.candidatos_ciencia(m, L) for k, m in mapas.items()})
+
+
+def datos_sitio(nombre):
+    if nombre not in sitios.SITIOS:
+        raise HTTPException(404, f"Sitio desconocido: {nombre}. Opciones: {', '.join(sitios.SITIOS)}.")
+    return _cargar_sitio(nombre)
+
+
+datos_sitio("jezero")       # Jezero queda listo al arrancar; los demás se cargan al primer uso
 
 app = FastAPI(title="Planificador Marswalk")
 
@@ -55,9 +73,8 @@ def a_xy(celdas):
     return np.round(np.c_[x, y], 1).tolist()
 
 
-def celda_libre_cercana(celda, max_m=AJUSTE_MAX_M, res=20.0, costo=None):
+def celda_libre_cercana(celda, costo, max_m=AJUSTE_MAX_M, res=20.0):
     """Celda transitable mas cercana a `celda` dentro de max_m, o None."""
-    costo = COSTO if costo is None else costo
     k = int(max_m // res)
     f0, c0 = celda
     n, m = costo.shape
@@ -71,17 +88,16 @@ def celda_libre_cercana(celda, max_m=AJUSTE_MAX_M, res=20.0, costo=None):
     return (int(ff[i]), int(cc[i])), float(d[i])
 
 
-def a_celda(x, y, avisos, costo=None):
+def a_celda(x, y, avisos, costo):
     """Punto en metros -> celda transitable (ajustada si hace falta). Error 422 si no se puede.
-    `costo`: mapa con el que se valida (por defecto el de A*; las misiones v3 pasan el del agente)."""
-    costo = COSTO if costo is None else costo
+    `costo`: mapa con el que se valida (el de A* del sitio, o el del agente en las misiones v3)."""
     f, c = xy_a_rc(np.array([x]), np.array([y]))
     f, c = int(f[0]), int(c[0])
-    if not (0 <= f < COSTO.shape[0] and 0 <= c < COSTO.shape[1]):
+    if not (0 <= f < costo.shape[0] and 0 <= c < costo.shape[1]):
         raise HTTPException(422, f"El punto ({x:.0f}, {y:.0f}) esta fuera del mapa.")
     if np.isfinite(costo[f, c]):
         return f, c
-    ajuste = celda_libre_cercana((f, c), costo=costo)
+    ajuste = celda_libre_cercana((f, c), costo)
     if ajuste is None:
         raise HTTPException(422, f"El punto ({x:.0f}, {y:.0f}) cae en terreno bloqueado "
                                  f"y no hay terreno libre a menos de {AJUSTE_MAX_M:.0f} m.")
@@ -166,34 +182,44 @@ class PedidoEva(BaseModel):
     prioridad: str = Field("equilibrada", pattern="^(equilibrada|ciencia|rapida|segura)$")
 
 
+@app.get("/api/sitios")
+def lista_sitios():
+    return {"sitios": [{"id": k, **v} for k, v in sitios.SITIOS.items()]}
+
+
 @app.get("/api/salud")
-def salud():
-    return {"ok": True, "forma": list(COSTO.shape), "candidatos": {k: len(v) for k, v in CANDIDATOS.items()}}
+def salud(sitio: str = "jezero"):
+    s = datos_sitio(sitio)
+    return {"ok": True, "sitio": sitio, "forma": list(s.costo.shape),
+            "candidatos": {k: len(v) for k, v in s.candidatos.items()}}
 
 
 @app.post("/api/ruta")
-def ruta(p: PedidoRuta):
+def ruta(p: PedidoRuta, sitio: str = "jezero"):
     """Une los puntos en orden con A* (como planear_mision)."""
+    s = datos_sitio(sitio)
     avisos = []
-    celdas = [a_celda(x, y, avisos) for x, y in p.puntos]
+    celdas = [a_celda(x, y, avisos, s.costo) for x, y in p.puntos]
     try:
-        mision = planear_mision(COSTO, celdas)
+        mision = planear_mision(s.costo, celdas)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     return {**resumen_mision(mision), "puntos": a_xy(celdas), "avisos": avisos}
 
 
 @app.post("/api/libre")
-def libre(p: PedidoLibre):
+def libre(p: PedidoLibre, sitio: str = "jezero"):
     """Mision libre A -> B del rover: frente de Pareto (ciencia, tiempo, riesgo) que cabe en
     factor x (horas y energia) de la ruta directa. Planificador v3 (mision_v3.py)."""
+    s = datos_sitio(sitio)
+    mapa, cands = s.mapas["rover"], s.candidatos["rover"]
     avisos = []
-    a = a_celda(*p.inicio, avisos, MAPAS["rover"].costo)
-    b = a_celda(*p.fin, avisos, MAPAS["rover"].costo)
+    a = a_celda(*p.inicio, avisos, mapa.costo)
+    b = a_celda(*p.fin, avisos, mapa.costo)
     if a == b:
         raise HTTPException(422, "El inicio y el final caen en la misma celda.")
     try:
-        plan = v3.planear(MAPAS["rover"], CANDIDATOS["rover"], a, b, v3.ROVER, factor=p.factor,
+        plan = v3.planear(mapa, cands, a, b, v3.ROVER, factor=p.factor,
                           max_candidatos=MAX_CANDIDATOS)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
@@ -201,29 +227,30 @@ def libre(p: PedidoLibre):
         avisos.append("Ningun objetivo cabe en el presupuesto: ruta directa.")
     if plan.get("aviso"):
         avisos.append(plan["aviso"])
-    return {**respuesta_v3(plan, p.prioridad, MAPAS["rover"], v3.ROVER), "inicio": a_xy([a])[0], "fin": a_xy([b])[0],
+    return {**respuesta_v3(plan, p.prioridad, mapa, v3.ROVER), "inicio": a_xy([a])[0], "fin": a_xy([b])[0],
             "factor": p.factor, "avisos": avisos}
 
 
 @app.get("/api/aleatorios")
-def aleatorios(n: int = 4, radio_m: float = RADIO_M, semilla: int | None = None):
+def aleatorios(n: int = 4, radio_m: float = RADIO_M, semilla: int | None = None, sitio: str = "jezero"):
     """n puntos al azar en terreno transitable, a menos de radio_m del aterrizaje.
     (Con todo el mapa las rutas pasan de 30 km y A* en Python tarda mas de 20 s.)"""
     if not 2 <= n <= 10:
         raise HTTPException(422, "n debe estar entre 2 y 10.")
-    centro = tuple(int(v) for v in L["ruta_rc"][0])
-    libres = np.argwhere(np.isfinite(COSTO) & (distancia_a(COSTO.shape, centro) <= radio_m))
+    s = datos_sitio(sitio)
+    libres = np.argwhere(np.isfinite(s.costo) & (distancia_a(s.costo.shape, s.centro) <= radio_m))
     elegidas = np.random.default_rng(semilla).choice(len(libres), n, replace=False)
     return {"puntos": a_xy(libres[elegidas])}
 
 
 @app.post("/api/eva")
-def eva(p: PedidoEva):
+def eva(p: PedidoEva, sitio: str = "jezero"):
     """EVA de astronautas: sale del habitat, no pasa del radio y regresa (planificador v3 + Marswalk v4).
     Recursos de una persona: oxigeno del traje (sale del gasto metabolico) y horas de soporte vital.
     Ademas, en cada punto de la ruta: margen de O2 para volver al habitat e intensidad del esfuerzo."""
     avisos = []
-    mapa, cands_v3 = MAPAS["astronauta"], CANDIDATOS["astronauta"]
+    s = datos_sitio(sitio)
+    mapa, cands_v3 = s.mapas["astronauta"], s.candidatos["astronauta"]
     if p.habitat is None:
         cands = [{"celda": c["celda"], "puntaje": c["ciencia"]} for c in cands_v3]
         habitat, _ = mejor_centroide(mapa.costo, cands, p.radio_m)

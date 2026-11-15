@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rutaDatos } from './sitio.js';
 
 /**
  * Capas de datos sobre el terreno: minerales CRISM y mapa de costos.
@@ -9,9 +10,9 @@ import * as THREE from 'three';
  * evitar el parpadeo (z-fighting) con el terreno, que ocupa exactamente el mismo lugar.
  */
 export async function cargarCapas(terreno, anisotropia = 1) {
-  const resp = await fetch('/data/capas.json');
+  const resp = await fetch(rutaDatos('capas.json'));
   const esJson = resp.headers.get('content-type')?.includes('json');
-  if (!resp.ok || !esJson) throw new Error('No se encontró /data/capas.json (sección 13.4 del notebook)');
+  if (!resp.ok || !esJson) throw new Error(`No se encontró ${rutaDatos('capas.json')} (notebook 13.4 o exportar_sitio.py)`);
   const info = await resp.json();
 
   const material = new THREE.MeshLambertMaterial({
@@ -37,7 +38,7 @@ export async function cargarCapas(terreno, anisotropia = 1) {
       return;
     }
     if (!texturas[nombre]) {
-      const tex = await cargador.loadAsync(`/data/${info[nombre].archivo}`);
+      const tex = await cargador.loadAsync(rutaDatos(info[nombre].archivo));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = anisotropia;
       texturas[nombre] = tex;
@@ -70,6 +71,6 @@ function dibujarLeyenda(capa) {
     caja.innerHTML = `
       <div class="degradado" style="background:linear-gradient(to right, ${e.colores.join(', ')})"></div>
       <div class="extremos"><span>${e.min} barato</span><span>caro ${e.max}+</span></div>
-      <div><span class="cuadro" style="background:${capa.bloqueado}"></span>bloqueado (≥ 20°)</div>`;
+      <div><span class="cuadro" style="background:${capa.bloqueado}"></span>${capa.bloqueado_texto ?? 'bloqueado (≥ 20°)'}</div>`;
   }
 }

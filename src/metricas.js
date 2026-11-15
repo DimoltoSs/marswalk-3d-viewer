@@ -5,6 +5,7 @@
  *   comparacion                       -> sección 13.4
  * El plan v1 (rutas.json) solo tiene costo_total y presupuesto.
  */
+import { INFO, SITIO } from './sitio.js';
 
 // Clic en el título: plegar / desplegar
 document.getElementById('metricas-titulo')
@@ -57,7 +58,7 @@ export function mostrarMetricas(datos) {
       <div class="seccion"><h3>Plan v1 · prototipo_uno</h3>
         ${barra('Costo', datos.costo_total, datos.presupuesto, '')}
         <p class="nota">${datos.objetivos.length} objetivos. Las métricas físicas y la comparación con
-        Perseverance están en el plan v2 (notebook).</p>
+        ${INFO.rover} están en el plan v2 (notebook).</p>
       </div>`;
     return;
   }
@@ -81,7 +82,7 @@ export function mostrarMetricas(datos) {
   if (c) {
     const n = c.nasa, t = c.nuestra;
     html += `
-      <div class="seccion"><h3>vs Perseverance · misión completa</h3>
+      <div class="seccion"><h3>vs ${INFO.rover} · misión completa</h3>
         <table class="vs">
           <tr><th></th><th>NASA</th><th>Nuestra</th><th></th></tr>
           ${filaVs('Distancia (km)', n.km, t.km, 1)}
@@ -101,7 +102,7 @@ export function mostrarMetricas(datos) {
       </div>`;
   } else if (sup?.planificador) {
     html += `<p class="nota">Planificador ${sup.planificador}: ${datos.frente?.length ?? 1} misiones en el frente de Pareto.
-      La comparación con Perseverance está en el plan v2.</p>`;
+      ${SITIO === 'jezero' ? 'La comparación con Perseverance está en el plan v2.' : `Inicio y meta: extremos de la ruta de ${INFO.rover} dentro del mapa. Minerales aproximados.`}</p>`;
   } else {
     html += `<p class="nota">Corre la sección 13.4 del notebook para ver la comparación con Perseverance.</p>`;
   }
@@ -188,6 +189,6 @@ export function mostrarMetricasVivo(modo, r) {
       ${filas ? `<table class="vs"><tr><th></th><th>Área</th><th>Ciencia</th></tr>${filas}</table>`
               : '<p class="nota">Ninguno cabe en el presupuesto: ruta directa.</p>'}
       <p class="nota">${r.waypoints ? `${r.waypoints.length} waypoints. ` : ''}Pendiente ≥ ${u.bloqueo}° = obstáculo.
-      La arena detectada en HiRISE (p. ej. Séítah) cuesta más y se rodea.</p>
+      La arena detectada en HiRISE${INFO.arena} cuesta más y se rodea.</p>
     </div>`;
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { crearPin, crearTubo } from './rutas.js';
 import { ESCALA_M } from './terreno.js';
+import { conSitio } from './sitio.js';
 
 /**
  * Planificador en vivo: el visor le pide rutas a servidor.py (FastAPI, puerto 8000).
@@ -57,7 +58,7 @@ async function api(ruta, cuerpo) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cuerpo),
   };
-  const resp = await fetch(`/api/${ruta}`, opciones);
+  const resp = await fetch(conSitio(`/api/${ruta}`), opciones);
   const esJson = resp.headers.get('content-type')?.includes('json');
   if (!esJson) throw new Error('El servidor no responde: arranca servidor.py (puerto 8000).');
   const datos = await resp.json();

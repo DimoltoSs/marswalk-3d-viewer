@@ -1,0 +1,9 @@
+{
+  "n": 400,
+  "extension_m": 20000,
+  "elev_min_m": -4553.5458984375,
+  "elev_max_m": -1727.855224609375,
+  "orden": "fila 0 = Norte, columna 0 = Oeste",
+  "fuente": "USGS Astropedia: Mars MSL Gale Merged DEM 1m v3 (Parker & Calef 2016)",
+  "sitio": "Gale"
+}

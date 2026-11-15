@@ -108,11 +108,19 @@
     <h2 id="panel-titulo">Jezero · Marswalk</h2>
 
     <div class="seccion">
+      <h3>Lugar</h3>
+      <select id="sitio">
+        <option value="jezero">Cráter Jezero · Perseverance</option>
+        <option value="gale">Cráter Gale · Curiosity</option>
+      </select>
+    </div>
+
+    <div class="seccion">
       <h3>Misión</h3>
       <select id="plan">
-        <option value="rutas_v2.json">v2 · misión del notebook</option>
+        <option value="rutas_v2.json" data-sitios="jezero">v2 · misión del notebook</option>
         <option value="rutas_v3.json">v3 · genético mejorado</option>
-        <option value="rutas.json">v1 · prototipo_uno</option>
+        <option value="rutas.json" data-sitios="jezero">v1 · prototipo_uno</option>
         <option value="libre">Misión del robot · A → B</option>
         <option value="eva">EVA de astronautas · 3 km</option>
       </select>
@@ -138,7 +146,7 @@
     <div class="seccion">
       <h3>Capa sobre el terreno</h3>
       <select id="capa">
-        <option value="">Ninguna (solo foto CTX)</option>
+        <option value="">Ninguna (solo foto)</option>
         <option value="crism">Minerales (CRISM)</option>
         <option value="costo">Mapa de costos</option>
       </select>

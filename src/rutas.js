@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { rutaDatos } from './sitio.js';
 
 const COLORES = {
-  real: 0xffffff,      // ruta real de Perseverance
+  real: 0xffffff,      // ruta real del rover de la NASA (Perseverance o Curiosity)
   plan: 0xff3b3b,      // nuestro plan
   objetivo: 0xffd23f,  // objetivos científicos
   inicio: 0x3dff6e,
@@ -14,10 +15,10 @@ const COLORES = {
  *  - rutas.json:    plan v1 de prototipo_uno (exportar_rutas.py)
  */
 export async function cargarDatosRutas(archivo = 'rutas_v2.json') {
-  const resp = await fetch(`/data/${archivo}`);
+  const resp = await fetch(rutaDatos(archivo));
   // Si el archivo no existe, Vite responde 200 con index.html: hay que revisar el tipo
   const esJson = resp.headers.get('content-type')?.includes('json');
-  if (!resp.ok || !esJson) throw new Error(`No se encontró /data/${archivo}`);
+  if (!resp.ok || !esJson) throw new Error(`No se encontró ${rutaDatos(archivo)}`);
   return resp.json();
 }
 

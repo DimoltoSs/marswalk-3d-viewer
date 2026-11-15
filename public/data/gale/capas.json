@@ -1,0 +1,40 @@
+{
+  "crism": {
+    "archivo": "capa_crism.png",
+    "titulo": "Minerales (CRISM, aproximado)",
+    "leyenda": [
+      {
+        "nombre": "Mg-Carbonate",
+        "color": "#00ff00",
+        "valor": 1.0
+      },
+      {
+        "nombre": "Fe/Mg-Smectite",
+        "color": "#00ffff",
+        "valor": 1.0
+      },
+      {
+        "nombre": "Sulfato",
+        "color": "#ff00ff",
+        "valor": 1.0
+      }
+    ]
+  },
+  "costo": {
+    "archivo": "capa_costo.png",
+    "titulo": "Mapa de costos (rover)",
+    "escala": {
+      "min": 1.0,
+      "max": 11.19,
+      "colores": [
+        "#006837",
+        "#87cb67",
+        "#fffebe",
+        "#f88c51",
+        "#a50026"
+      ]
+    },
+    "bloqueado": "#46005a",
+    "bloqueado_texto": "bloqueado (≥ 30°)"
+  }
+}

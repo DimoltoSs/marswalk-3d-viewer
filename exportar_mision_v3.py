@@ -5,7 +5,9 @@ Perseverance, presupuesto = FACTOR x la ruta directa), pero con el planificador 
 (mision_v3.py): rutas normal/segura por tramo, varios órdenes, búsqueda local y paro por
 estancamiento. Guarda la misión elegida con los mismos pesos que el notebook y el frente completo.
 
-Uso (desde visor_3d):  python exportar_mision_v3.py [--factor 2.0] [--semilla 42]
+Con --sitio gale hace lo mismo en Gale (extremos de la ruta de Curiosity dentro del mapa) y guarda en public/data/gale/.
+
+Uso (desde visor_3d):  python exportar_mision_v3.py [--sitio jezero|gale] [--factor 2.0] [--semilla 42]
 """
 import argparse
 import json
@@ -16,9 +18,10 @@ import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
-from proto1_capas import cargar, rc_a_xy  # noqa: E402
+from proto1_capas import rc_a_xy  # noqa: E402
 
 import mision_v3 as v3  # noqa: E402
+import sitios  # noqa: E402
 
 PESOS = {"ciencia": 0.5, "tiempo": 0.3, "riesgo": 0.2}   # los mismos que la sección 10 del notebook
 
@@ -34,10 +37,12 @@ def main():
     ap.add_argument("--factor", type=float, default=2.0, help="presupuesto = factor x ruta directa")
     ap.add_argument("--semilla", type=int, default=42)
     ap.add_argument("--candidatos", type=int, default=15)
-    ap.add_argument("--salida", default=os.path.join(AQUI, "public", "data", "rutas_v3.json"))
+    ap.add_argument("--sitio", default="jezero", choices=list(sitios.SITIOS))
+    ap.add_argument("--salida", default=None, help="por defecto: public/data[/<sitio>]/rutas_v3.json")
     a = ap.parse_args()
+    a.salida = a.salida or os.path.join(sitios.carpeta_web(a.sitio), "rutas_v3.json")
 
-    L = cargar()
+    L = sitios.cargar(a.sitio)
     mapa = v3.Mapa.desde_capas(L, p=v3.parametros(v3.ROVER))   # Marswalk v4: rover con P_ROVER (bloqueo 30°)
     cands = v3.candidatos_ciencia(mapa, L)
     inicio = tuple(int(v) for v in L["ruta_rc"][0])
@@ -58,7 +63,7 @@ def main():
 
     real = [L["ruta_xy_m"][0].tolist()]
     for p in L["ruta_xy_m"][1:]:
-        if np.hypot(*(p - np.array(real[-1]))) > 5:              # sin puntos repetidos
+        if np.hypot(*(p - np.array(real[-1]))) > (5 if a.sitio == "jezero" else 40):   # sin puntos repetidos
             real.append(p.tolist())
     salida = {
         "plan": a_xy(camino),
@@ -74,6 +79,7 @@ def main():
         "metricas": resumen(elegida),
         "presupuesto": {"horas": round(plan["presupuesto"]["h"], 1),
                         "wh": round(plan["presupuesto"]["wh"])},
+        "sitio": a.sitio,
         "supuestos": {"horas_por_objetivo": v3.ROVER.horas_por_objetivo, "factor": a.factor,
                       "reserva_energia": op.reserva_energia, "pesos": PESOS,
                       "planificador": "v3 + Marswalk v4 (mision_v3.py)",

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rutaDatos } from './sitio.js';
 
 // Escala de la escena: 1 unidad = 100 m (el mapa de 20 km mide 200 unidades).
 export const ESCALA_M = 100;
@@ -9,8 +10,8 @@ export const ESCALA_M = 100;
  */
 export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
   // ---- 1. Datos ----
-  const meta = await (await fetch('/data/meta.json')).json();
-  const buffer = await (await fetch('/data/dem.bin')).arrayBuffer();
+  const meta = await (await fetch(rutaDatos('meta.json'))).json();
+  const buffer = await (await fetch(rutaDatos('dem.bin'))).arrayBuffer();
   const elev = new Float32Array(buffer);          // n × n alturas en metros, fila 0 = Norte
   const n = meta.n;
   if (elev.length !== n * n) {
@@ -65,7 +66,7 @@ export async function cargarTerreno({ exageracion = 3, anisotropia = 1 } = {}) {
   aplicarExageracion(exageracion);
 
   // ---- 5. Textura CTX y material ----
-  const textura = await new THREE.TextureLoader().loadAsync('/data/textura.jpg');
+  const textura = await new THREE.TextureLoader().loadAsync(rutaDatos('textura.jpg'));
   textura.colorSpace = THREE.SRGBColorSpace;      // sin esto la imagen se ve deslavada
   textura.anisotropy = anisotropia;               // nitidez en vistas rasantes
 

@@ -10,8 +10,10 @@ import { mostrarMetricas, mostrarMetricasVivo } from './metricas.js';
 import { cargarCapas } from './capas.js';
 import { crearReplaneo } from './replaneo.js';
 import { crearPlanificador } from './planificador.js';
+import { SITIO, INFO, prepararPanel } from './sitio.js';
 
 async function iniciar() {
+  prepararPanel();                              // lugar (Jezero / Gale): títulos y misiones disponibles
   const canvas = document.getElementById('lienzo');
   const { renderer, scene, camera } = crearEscena(canvas);
 
@@ -22,13 +24,13 @@ async function iniciar() {
   controles.minDistance = 2;
   controles.maxDistance = 400;
   camera.position.set(40, 70, 90);              // vista inicial sobre la zona de las rutas
-  controles.target.set(-25, 0, 0);
+  controles.target.set(...INFO.vista);
 
   // Cada parte se carga por separado: si una falla queda en null y el resto sigue funcionando.
   let terreno = null, rutas = null, rover = null, recorrido = null, capas = null;
   let replaneo = null, conReplaneo = false;   // peligro simulado y desvío autónomo
   let planificador = null;                     // misión libre y EVA (servidor.py)
-  let modo = 'rutas_v2.json';                  // valor del selector de misión
+  let modo = document.getElementById('plan').value;   // valor del selector de misión (la primera del sitio)
   const esVivo = () => modo === 'libre' || modo === 'eva';
   let seguir = false;
   const opcionesRecorrido = { velocidad_m_s: 300 };
@@ -84,7 +86,7 @@ async function iniciar() {
   // ---- 3. Rutas y métricas ----
   let datosRutas = null;
   try {
-    datosRutas = await cargarDatosRutas('rutas_v2.json');
+    datosRutas = await cargarDatosRutas(modo);
     rutas = crearRutas(terreno, datosRutas);
     scene.add(rutas.grupo);
     mostrarMetricas(datosRutas);
@@ -104,12 +106,14 @@ async function iniciar() {
   }
 
   // ---- 4b. Replaneo: peligro simulado y desvío (opcional) ----
-  try {
-    replaneo = crearReplaneo(terreno, await cargarDatosRutas('replaneo.json'));
-    scene.add(replaneo.grupo);
-  } catch (err) {
-    aviso(`${err.message} (se genera con exportar_replaneo.py)`);
-    document.getElementById('replaneo').disabled = true;
+  if (SITIO === 'jezero') {                     // el peligro simulado solo existe para el plan v2 de Jezero
+    try {
+      replaneo = crearReplaneo(terreno, await cargarDatosRutas('replaneo.json'));
+      scene.add(replaneo.grupo);
+    } catch (err) {
+      aviso(`${err.message} (se genera con exportar_replaneo.py)`);
+      document.getElementById('replaneo').disabled = true;
+    }
   }
 
   /** (Re)inicia el rover sobre `camino` (null = sin ruta: se oculta).
