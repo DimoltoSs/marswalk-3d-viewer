@@ -26,6 +26,9 @@ from eva import RADIO_M, distancia_a, mejor_centroide         # noqa: E402
 from replaneo import distancia_acumulada                     # noqa: E402
 import mision_v3 as v3                                       # noqa: E402
 import sitios                                                # noqa: E402
+import eva_avanzada as ea                                    # noqa: E402
+from dataclasses import replace                              # noqa: E402
+from datetime import date                                    # noqa: E402
 
 AJUSTE_MAX_M = 300.0    # si un punto cae en obstaculo, se mueve a la celda libre mas cercana
 MAX_CANDIDATOS = 15     # candidatos que entran a la matriz de tramos de una mision
@@ -174,11 +177,21 @@ class PedidoLibre(BaseModel):
     prioridad: str = Field("equilibrada", pattern="^(equilibrada|ciencia|rapida|segura)$")
 
 
+class Astronauta(BaseModel):
+    masa_kg: float = Field(80.0, ge=40, le=150)          # persona, sin traje
+    o2_L: float = Field(O2_TRAJE_L, gt=0, le=2000)       # oxígeno de su traje (L)
+
+
 class PedidoEva(BaseModel):
     habitat: tuple[float, float] | None = None        # None = el mejor centroide
     radio_m: float = Field(RADIO_M, gt=0, le=10000)
-    o2_L: float = Field(O2_TRAJE_L, gt=0, le=2000)       # oxigeno del traje (L); por defecto, el del EMU
+    o2_L: float | None = Field(None, gt=0, le=2000)      # (compatibilidad) mismo O2 para los dos
+    pareja: list[Astronauta] = Field(default_factory=lambda: [Astronauta(masa_kg=80), Astronauta(masa_kg=70)],
+                                     min_length=2, max_length=2)
     horas: float = Field(HORAS_EVA, gt=0, le=24)
+    evitar_sin_senal: bool = True                      # la ruta evita (si puede) las zonas sin radio
+    fecha: date | None = None                          # día terrestre (None = hoy) -> estación de Marte
+    hora_salida: float = Field(9.0, ge=0, lt=24)       # hora solar local de salida (12 = mediodía)
     prioridad: str = Field("equilibrada", pattern="^(equilibrada|ciencia|rapida|segura)$")
 
 
@@ -245,49 +258,116 @@ def aleatorios(n: int = 4, radio_m: float = RADIO_M, semilla: int | None = None,
 
 @app.post("/api/eva")
 def eva(p: PedidoEva, sitio: str = "jezero"):
-    """EVA de astronautas: sale del habitat, no pasa del radio y regresa (planificador v3 + Marswalk v4).
-    Recursos de una persona: oxigeno del traje (sale del gasto metabolico) y horas de soporte vital.
-    Ademas, en cada punto de la ruta: margen de O2 para volver al habitat e intensidad del esfuerzo."""
-    avisos = []
+    """EVA en pareja: dos astronautas salen del hábitat, no pasan del radio y regresan (planificador v3 + Marswalk v4).
+    Se planea con el más limitado de los dos; cada punto de la ruta se revisa con: O2 de cada uno para volver,
+    rescate si uno se lesiona (eva_avanzada.py), señal de radio con el hábitat y luz del Sol a esa hora."""
     s = datos_sitio(sitio)
-    mapa, cands_v3 = s.mapas["astronauta"], s.candidatos["astronauta"]
+    avisos = []
+    base, cands_v3 = s.mapas["astronauta"], s.candidatos["astronauta"]
+    if p.o2_L is not None:
+        for a in p.pareja:
+            a.o2_L = p.o2_L
     if p.habitat is None:
         cands = [{"celda": c["celda"], "puntaje": c["ciencia"]} for c in cands_v3]
-        habitat, _ = mejor_centroide(mapa.costo, cands, p.radio_m)
+        habitat, _ = mejor_centroide(base.costo, cands, p.radio_m)
         avisos.append("Habitat en el mejor centroide (mas ciencia dentro del radio).")
     else:
-        habitat = a_celda(*p.habitat, avisos, mapa.costo)
-    tanque_wh = p.o2_L / v3.O2_L_POR_WH
-    plan = v3.planear(mapa, cands_v3, habitat, None, v3.ASTRONAUTA,
-                      presupuesto={"h": p.horas, "wh": tanque_wh}, radio_m=p.radio_m,
-                      max_candidatos=MAX_CANDIDATOS)
-    datos = {"habitat": a_xy([habitat])[0], "radio_m": p.radio_m, "horas_max": p.horas,
-             "o2_tanque_L": p.o2_L, "o2_usable_L": round(p.o2_L * (1 - RESERVA_O2), 1),
-             "intensidad_max_ok_Lh": INTENSIDAD_MAX_LH, "avisos": avisos, "objetivos": [], "frente": []}
+        habitat = a_celda(*p.habitat, avisos, base.costo)
+
+    # ---- Luz: el Sol limita la duración ----
+    lat = sitios.SITIOS[sitio]["lat"]
+    dia = p.fecha or date.today()
+    ls, dec = ea.declinacion_sol(dia)
+    amanecer, ocaso = ea.horas_de_luz(lat, dec)
+    salida = p.hora_salida
+    if salida < amanecer:
+        avisos.append(f"A las {salida:.1f} h aún es de noche: la salida se movió al amanecer ({amanecer:.1f} h).")
+        salida = amanecer
+    luz_h = (ocaso - salida) * ea.HORA_MARCIANA_H
+    if luz_h < 0.5:
+        raise HTTPException(422, f"Queda menos de media hora de luz (el Sol se pone a las {ocaso:.1f} h).")
+    horas = min(p.horas, luz_h)
+    if horas < p.horas:
+        avisos.append(f"Solo quedan {luz_h:.1f} h de luz: la EVA se limita a eso (no a {p.horas:g} h).")
+
+    # ---- Pareja: se planea con el más limitado ----
+    pareja = [{"agente": ea.astronauta(a.masa_kg), "o2_L": a.o2_L, "masa_kg": a.masa_kg} for a in p.pareja]
+    w, presupuesto_wh = ea.presupuesto_pareja(pareja)
+    ag = pareja[w]["agente"]
+    tanques_wh = [q["o2_L"] / v3.O2_L_POR_WH for q in pareja]
+
+    # ---- Radio ----
+    cobertura = ea.cobertura_radio(base, habitat, p.radio_m)
+    mapa = ea.con_radio(base, cobertura) if p.evitar_sin_senal else base
+
+    plan = v3.planear(mapa, cands_v3, habitat, None, ag, presupuesto={"h": horas, "wh": presupuesto_wh},
+                      radio_m=p.radio_m, max_candidatos=MAX_CANDIDATOS)
+    datos = {"habitat": a_xy([habitat])[0], "radio_m": p.radio_m, "horas_max": round(horas, 2),
+             "o2_tanque_L": pareja[w]["o2_L"], "o2_usable_L": round(pareja[w]["o2_L"] * (1 - RESERVA_O2), 1),
+             "intensidad_max_ok_Lh": INTENSIDAD_MAX_LH, "avisos": avisos, "objetivos": [], "frente": [],
+             "pareja_info": [{"masa_kg": q["masa_kg"], "o2_L": q["o2_L"]} for q in pareja], "gasta_mas": w,
+             "luz": {"fecha": dia.isoformat(), "ls": round(ls, 1), "declinacion": round(dec, 2),
+                     "amanecer": round(amanecer, 2), "ocaso": round(ocaso, 2), "salida": round(salida, 2)},
+             "radio": {"antena_habitat_m": ea.ANTENA_HABITAT_M, "antena_traje_m": ea.ANTENA_TRAJE_M,
+                       "evita_sin_senal": p.evitar_sin_senal}}
+    el0, az0 = ea.sol(lat, dec, salida)
+    datos["luz"]["sol_salida"] = {"elev": round(float(el0), 1), "azimut": round(float(az0), 1)}
     if not plan["frente"]:
         avisos.append("Ningun objetivo alcanzable dentro del radio, las horas y el oxigeno.")
         return datos
-    regreso = v3.costo_regreso(mapa, habitat, v3.ASTRONAUTA, radio_m=p.radio_m + 500)
-    seg = [seguridad_eva(mapa, plan, m, regreso, tanque_wh, p.o2_L) for m in plan["frente"]]
-    # La vida primero: las 4 misiones con nombre se eligen solo entre las que vuelven con >= 15 % del tanque.
-    seguras = [i for i, s in enumerate(seg) if s["seguridad"]["tanque_final_pct"] >= 100 * ALERTA_O2]
+
+    rmax = p.radio_m + 500
+    reg = ea.regresos(base, habitat, {0: pareja[0]["agente"], 1: pareja[1]["agente"]}, rmax)
+    asist = ea.regresos(base, habitat, {
+        "ayuda0": replace(pareja[0]["agente"], kit_kg=pareja[0]["agente"].kit_kg + ea.CARGA_AYUDA_KG),
+        "ayuda1": replace(pareja[1]["agente"], kit_kg=pareja[1]["agente"].kit_kg + ea.CARGA_AYUDA_KG),
+        "herido0": pareja[0]["agente"], "herido1": pareja[1]["agente"]}, rmax, ea.VEL_ASISTIDA)
+    ctx = dict(base=base, pareja=pareja, w=w, tanques_wh=tanques_wh, reg=reg, asist=asist, horas=horas,
+               cobertura=cobertura, lat=lat, dec=dec, salida=salida)
+    seg = [evaluar_eva(plan, m, ctx) for m in plan["frente"]]
+    # Límite duro: si alguno de los dos volvería con menos del 10 % de su tanque, la misión no existe.
+    vivas = [i for i, x in enumerate(seg) if x["seguridad"]["tanque_final_pct"] >= 100 * RESERVA_O2]
+    if len(vivas) < len(seg):
+        avisos.append(f"{len(seg) - len(vivas)} mision(es) descartadas: uno de los dos volveria con menos de 10 % de O2.")
+    if not vivas:
+        avisos.append("Ninguna mision deja a los dos con 10 % de oxigeno: acerca el habitat o sube el O2.")
+        return datos
+    plan["frente"] = [plan["frente"][i] for i in vivas]
+    seg = [seg[i] for i in vivas]
+    plan["nombradas"] = v3.nombrar(plan["frente"])
+
+    # La vida primero: las 4 misiones con nombre se eligen entre las que (1) dejan >= 15 % de O2 a los dos y
+    # (2) permiten volver con un compañero lesionado desde cualquier punto. Si ninguna cumple (2), se relaja.
+    o2_ok = [i for i, x in enumerate(seg) if x["seguridad"]["tanque_final_pct"] >= 100 * ALERTA_O2]
+    seguras = [i for i in o2_ok if seg[i]["sin_rescate"] is None]
+    if not seguras and o2_ok:
+        seguras = o2_ok
+        avisos.append("Ninguna mision permite volver con un companero lesionado desde todos los puntos: "
+                      "se muestran las que cumplen el oxigeno (ver el tramo sin rescate).")
     if seguras:
         sub = v3.nombrar([plan["frente"][i] for i in seguras])
         plan["nombradas"] = {k: seguras[i] for k, i in sub.items()}
     else:
         avisos.append("Ninguna mision vuelve con 15 % de oxigeno: se muestran las que dejan entre 10 y 15 %.")
-    r = respuesta_v3(plan, p.prioridad, mapa, v3.ASTRONAUTA)
+    r = respuesta_v3(plan, p.prioridad, mapa, ag)
+    con_detalle = set(plan["nombradas"].values())
     hx, hy = datos["habitat"]
-    for m_json, s in zip(r["frente"], seg):
+    for i, (m_json, x) in enumerate(zip(r["frente"], seg)):
         xy = np.asarray(m_json["plan"])
         m_json["metricas"]["max_alejamiento_m"] = round(float(np.hypot(xy[:, 0] - hx, xy[:, 1] - hy).max()))
-        m_json.update(s)
-        m_json["metricas"]["intensidad_max_Lh"] = max(m_json["intensidad_Lh"], default=0)
-        m_json["metricas"]["tanque_final_pct"] = s["seguridad"]["tanque_final_pct"]
+        m_json["metricas"]["intensidad_max_Lh"] = max(x["intensidad_Lh"], default=0)
+        m_json["metricas"]["tanque_final_pct"] = x["seguridad"]["tanque_final_pct"]
+        justo = min(range(2), key=lambda k: x["pareja"][k]["tanque_final_pct"])     # quien vuelve con menos
+        m_json["metricas"]["o2_L"] = x["pareja"][justo]["o2_usado_L"]
+        m_json["metricas"]["o2_usable_L"] = round(pareja[justo]["o2_L"] * (1 - RESERVA_O2), 1)
+        if i not in con_detalle:          # los arreglos por punto solo hacen falta en las misiones que se dibujan
+            x = {k: v for k, v in x.items() if k in ("seguridad", "pareja", "sin_rescate", "no_retorno")}
+            m_json["plan"] = None
+        m_json.update(x)
     datos["descartadas_justas"] = len(seg) - len(seguras)
     elegida = r["frente"][plan["nombradas"][p.prioridad]]
-    r.update(elegida)                     # respuesta_v3 copio la elegida antes de agregarle la seguridad
-    r["presupuesto"] = {"h": p.horas, "o2_L": datos["o2_usable_L"]}
+    r.update(elegida)
+    r["presupuesto"] = {"h": round(horas, 2), "o2_L": datos["o2_usable_L"]}
     datos.update(r)
     if datos["no_retorno"] is not None:
         avisos.append("PELIGRO: hay un punto de la ruta desde el que ya no alcanza el oxigeno para volver.")
@@ -295,35 +375,65 @@ def eva(p: PedidoEva, sitio: str = "jezero"):
     return datos
 
 
-def seguridad_eva(mapa, plan, m, regreso, tanque_wh, tanque_L):
-    """Por punto del camino: margen de O2 [L] = usable - (gastado + lo que cuesta volver al habitat desde ahi),
-    e intensidad de la caminata [L/h de O2].
-    punto_critico = el punto desde donde volver directo al habitat cuesta mas O2 (el mas comprometido).
-    no_retorno = primer punto con margen negativo: desde ahi ya no alcanza para volver (None = nunca)."""
-    rg = v3.regreso_mision(mapa, plan["tramos"], plan["problema"], m, regreso, tanque_wh, RESERVA_O2)
-    margen = np.asarray(rg["margen_wh"], float) * v3.O2_L_POR_WH
-    margen = np.where(np.isfinite(margen), margen, -1.0)
-    a = np.asarray(rg["camino"])
-    ag = v3.ASTRONAUTA
-    dz = np.diff(mapa.dem[a[:, 0], a[:, 1]])
+def evaluar_eva(plan, m, c):
+    """Revisa una misión punto por punto. Oxígeno: para cada astronauta, margen = usable - (gastado + volver al
+    hábitat desde ahí); en la ruta se muestra el peor de los dos. Además rescate, radio y luz (eva_avanzada.py).
+    punto_critico = desde donde volver cuesta más O2; no_retorno = primer punto sin O2 para volver (None = nunca)."""
+    base, pareja, w = c["base"], c["pareja"], c["w"]
+    T, pb = plan["tramos"], plan["problema"]
+    rg = v3.regreso_mision(base, T, pb, m, {"wh": c["reg"][w]}, c["tanques_wh"][w], RESERVA_O2)    # quien más gasta
+    camino, paradas = rg["camino"], rg["paradas"]
+    perfiles = {}
+    for k, q in enumerate(pareja):
+        perfiles[k] = rg if k == w else v3.perfil_regreso(base, camino, {"wh": c["reg"][k]}, q["agente"],
+                                                          c["tanques_wh"][k], RESERVA_O2, paradas)
+    tanque_pct, margen_L, por_persona = None, None, []
+    for k, q in enumerate(pareja):
+        mg = np.asarray(perfiles[k]["margen_wh"], float) * v3.O2_L_POR_WH
+        mg = np.where(np.isfinite(mg), mg, -1.0)
+        pct = 100 * (mg + RESERVA_O2 * q["o2_L"]) / q["o2_L"]
+        tanque_pct = pct if tanque_pct is None else np.fmin(tanque_pct, pct)
+        margen_L = mg if margen_L is None else np.fmin(margen_L, mg)
+        usado = perfiles[k]["gastado_wh"][-1] * v3.O2_L_POR_WH
+        por_persona.append({"o2_usado_L": round(usado, 1), "tanque_final_pct": round(float(pct[-1]), 1),
+                            "no_retorno": perfiles[k]["punto_no_retorno"]})
+    no_ret = [x["no_retorno"] for x in por_persona if x["no_retorno"] is not None]
+
+    a = np.asarray(camino)
+    ag = pareja[w]["agente"]
+    dz = np.diff(np.nan_to_num(base.dem[a[:, 0], a[:, 1]]))
     dh = np.maximum(20.0 * np.hypot(*np.diff(a, axis=0).T), 1e-6)
-    lento = (mapa.riesgo | mapa.duna)[a[1:, 0], a[1:, 1]]
+    lento = (base.riesgo | base.duna)[a[1:, 0], a[1:, 1]]
     vel = np.where(lento, ag.vel_riesgo_m_h, ag.vel_seguro_m_h)
-    arena = mapa.arena[a[1:, 0], a[1:, 1]] if mapa.arena is not None else np.zeros(len(dh), bool)
+    arena = base.arena[a[1:, 0], a[1:, 1]] if base.arena is not None else np.zeros(len(dh), bool)
     eta = np.where(arena, ag.eta_arena, ag.eta_terreno)
     intensidad = v3.pandolf_w(ag, vel / 3600, 100 * dz / dh, eta) * v3.O2_L_POR_WH     # W -> L/h de O2
     volver = np.nan_to_num(np.asarray(rg["regreso_wh"], float)) * v3.O2_L_POR_WH
     critico = int(np.argmax(volver))
     tramo = np.hypot(dh, dz)
-    # % del tanque que quedaria si desde cada punto se volviera directo al habitat (margen + reserva de 10 %)
-    tanque_pct = 100 * (margen + RESERVA_O2 * tanque_L) / tanque_L
-    return {"margen_L": np.round(margen, 1).tolist(), "tanque_pct": np.round(tanque_pct, 1).tolist(),
+
+    t_h = ea.tiempos_camino(base, camino, ag, paradas)
+    gastado = [np.asarray(perfiles[k]["gastado_wh"], float) for k in (0, 1)]
+    rescate = ea.contingencia(base, camino, paradas, pareja, gastado, t_h, c["horas"], c["asist"])
+    radio = ea.tramos_sin_senal(camino, c["cobertura"])
+    hora = c["salida"] + t_h / ea.HORA_MARCIANA_H
+    elev, az = ea.sol(c["lat"], c["dec"], hora)
+    sombra, noche = ea.sombra_en_camino(base, camino, elev, az)
+    largo = np.r_[0.0, tramo]
+    return {"margen_L": np.round(margen_L, 1).tolist(), "tanque_pct": np.round(tanque_pct, 1).tolist(),
             "intensidad_Lh": np.round(intensidad, 1).tolist(),
-            "punto_critico": critico, "no_retorno": rg["punto_no_retorno"],
+            "punto_critico": critico, "no_retorno": min(no_ret) if no_ret else None,
+            "pareja": por_persona, **rescate, "senal": radio["senal"],
+            "sombra": sombra.tolist(), "hora_solar": np.round(hora, 2).tolist(),
             "seguridad": {"o2_volver_critico_L": round(float(volver[critico]), 1),
-                          "margen_critico_L": round(float(margen[critico]), 1),
-                          "sobrante_L": round(float(margen[-1] + RESERVA_O2 * tanque_L), 1),
+                          "margen_critico_L": round(float(margen_L[critico]), 1),
+                          "sobrante_L": round(min(q["o2_L"] * x["tanque_final_pct"] / 100
+                                                  for q, x in zip(pareja, por_persona)), 1),
                           "tanque_final_pct": round(float(tanque_pct[-1]), 1),
                           "tanque_min_pct": round(float(tanque_pct.min()), 1),
                           "intenso_pct": round(float(100 * tramo[intensidad > INTENSIDAD_MAX_LH].sum()
-                                                     / max(tramo.sum(), 1e-9)), 1)}}
+                                                     / max(tramo.sum(), 1e-9)), 1),
+                          "rescate_min_L": round(float(min(rescate["margen_rescate_L"])), 1),
+                          "sin_senal_pct": radio["sin_senal_pct"], "sin_senal_max_m": radio["sin_senal_max_m"],
+                          "sombra_pct": round(float(100 * largo[sombra].sum() / max(largo.sum(), 1e-9)), 1),
+                          "noche": bool(noche.any()), "regreso_hora": round(float(hora[-1]), 2)}}

@@ -165,3 +165,66 @@ cada mineral es un criterio del equipo, no una valoración de NASA.
 
 - Publicar en GitHub Pages para verlo sin instalar nada.
 - Versión optimizada del modelo del rover (menos triángulos y texturas comprimidas).
+
+## EVA en pareja, radio y luz (eva_avanzada.py)
+
+La EVA de astronautas es siempre de dos: en la NASA nadie sale solo. El código nuevo está en `eva_avanzada.py`;
+`mision_v3.py` (el modelo compartido con el repo del equipo) no cambió.
+
+### Cómo verlo
+1. Reiniciar el servidor: `python -m uvicorn servidor:app --port 8000`.
+2. Recargar el visor y elegir **EVA de astronautas**. En el panel izquierdo aparecen tres secciones:
+   - **Pareja de astronautas**: peso y O₂ de A y de B (por defecto 80 kg y 70 kg, 380 L cada uno).
+   - **Radio y luz**: evitar zonas sin señal, fecha y hora solar de salida.
+   - **Colorear la ruta por**: oxígeno, rescate, señal de radio o sol y sombra (cambiar el color no recalcula).
+
+### EVA en pareja
+- **Cómo se planea:** con quien más gasta al caminar y con el tanque más justo de los dos (convertido a su gasto).
+  Después se revisa a cada uno con su propio gasto.
+- **Descarte:** se elimina toda misión en la que alguno de los dos volvería con menos de 10 % de su tanque.
+  Las cuatro misiones con nombre exigen al menos 15 % a ambos.
+- **Rescate ("compañero lesionado"):** desde cada punto de la ruta se revisa que puedan volver si uno se lesiona,
+  probando a cada uno como el lesionado. Ambos deben llegar con O₂ (puede usarse la reserva de 10 %) y dentro de las
+  horas del traje. Las misiones con nombre exigen rescate posible desde todos los puntos; si ninguna lo cumple, se avisa.
+- **Supuestos propios (no son datos de la NASA):** el regreso con un lesionado va a la mitad de velocidad
+  (`VEL_ASISTIDA = 0.5`) y quien ayuda carga 30 kg extra (`CARGA_AYUDA_KG = 30`).
+- **Dato curioso del modelo:** el astronauta de 70 kg gasta más O₂ que el de 80 kg. La fórmula de Pandolf castiga
+  cargar un traje de 104 kg con un cuerpo más ligero (la carga pesa más en proporción al cuerpo).
+- **En el visor:** métricas "Pareja" (O₂ usado y % final de cada uno, el más justo marcado) y "Si uno se lesiona".
+  La barra de oxígeno muestra al que termina más justo.
+
+### Radio
+- Línea de vista entre el mástil del hábitat (10 m, `ANTENA_HABITAT_M`) y la antena del traje (2 m,
+  `ANTENA_TRAJE_M`), sobre el relieve y con la curvatura de Marte. Con esas alturas el horizonte queda a unos 12 km,
+  así que dentro de 3 km lo que corta la señal son las lomas y los escarpes, no la curvatura.
+- Con "Evitar zonas sin señal" activado, las celdas sin señal cuestan +3 (`W_SIN_SENAL`) y la ruta las rodea si
+  puede. Ejemplo en Jezero: el tramo sin señal bajó de 17 % a 6 % de la ruta.
+- Métricas: % de la ruta sin señal y el tramo seguido más largo sin contacto.
+
+### Iluminación (versión sencilla)
+- Posición del Sol en Marte para la fecha elegida con el algoritmo Mars24 (Allison y McEwen, 2000). Validado con
+  los aterrizajes: Perseverance (18 feb 2021) da Ls ≈ 5.5° (real ≈ 5.2°) y Curiosity (6 ago 2012) Ls ≈ 151°.
+- La hora de salida es hora solar local de Marte (12:00 = mediodía). Si se elige antes del amanecer, la salida se
+  mueve al amanecer.
+- La EVA no dura más que la luz que queda: saliendo a las 14:00, el límite baja de 8 h a unas 4.3 h.
+- Se marcan los tramos en sombra del relieve según la hora a la que se pasa por cada punto, y los que caerían de noche.
+- La luz de la escena 3D sale del Sol real a la hora de salida.
+- **Limitación:** la ruta no se desvía por la sombra, solo la marca. Desviarla exigiría que la búsqueda tome en
+  cuenta que la sombra se mueve con la hora (más lento y más complejo).
+
+### Tiempo de cálculo
+Cada EVA tarda unos 6–9 s (antes ~2 s). Lo nuevo (regresos de los dos, rescate, radio y sombras) suma unos 2 s;
+el resto es el algoritmo genético y la búsqueda del mejor centroide, que ya existían.
+
+### Archivos
+- Nuevo: `eva_avanzada.py`.
+- Cambiaron: `servidor.py` (endpoint `/api/eva`), `sitios.py` (latitud de cada sitio), `index.html`,
+  `src/main.js` (Sol de la escena), `src/planificador.js` (controles y colores), `src/metricas.js` (secciones Pareja,
+  Radio y luz).
+- Respaldos de antes del cambio: `_respaldo_v3/antes_pareja/`.
+- Petición de ejemplo (`POST /api/eva?sitio=gale`):
+  ```json
+  {"habitat": [0, 0], "pareja": [{"masa_kg": 80, "o2_L": 380}, {"masa_kg": 70, "o2_L": 380}],
+   "evitar_sin_senal": true, "fecha": "2027-03-01", "hora_salida": 9.0, "prioridad": "equilibrada"}
+  ```
+  Sigue aceptando el cuerpo viejo (`{"o2_L": 380}`), que da el mismo O₂ a los dos.

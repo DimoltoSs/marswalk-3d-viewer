@@ -29,6 +29,9 @@
     }
     #panel label { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
     #panel input[type=range] { flex: 1; min-width: 0; }
+    #panel input.corto { width: 52px; }
+    #panel input[type=date] { flex: 1; background: #222; color: #eee; border: 1px solid #555; border-radius: 4px; }
+    #eva-leyenda label { font-size: 11px; }
     #panel select, #panel button {
       width: 100%; margin-top: 2px; padding: 4px;
       background: #4a3428; color: inherit; border: 1px solid #6b4a3a; border-radius: 4px;
@@ -191,16 +194,35 @@
     </div>
 
     <div class="seccion" data-modos="eva" hidden>
-      <h3>Traje</h3>
-      <label>O₂ del traje
-        <input type="range" id="vivo-o2" min="100" max="600" step="10" value="380">
-        <span class="valor" id="vivo-o2-valor">380 L</span></label>
-      <p class="nota">380 L ≈ tanque principal del traje EMU de la NASA (8 h). Se guarda 10 % de reserva.</p>
-      <label><span class="muestra" style="background:#3ddc84"></span> &gt;25 %
-        <span class="muestra" style="background:#ffd23f"></span> 15–25 %
-        <span class="muestra" style="background:#ff3b3b"></span> 10–15 % de O₂</label>
-      <label><span class="muestra" style="background:#b45cff"></span> esfuerzo alto
-        <span class="muestra" style="background:#ff8c1a"></span> punto más comprometido</label>
+      <h3>Pareja de astronautas</h3>
+      <label>A · peso <input type="number" id="eva-masa-a" class="corto" min="40" max="150" step="1" value="80"> kg</label>
+      <label>A · O₂ <input type="range" id="eva-o2-a" min="100" max="600" step="10" value="380">
+        <span class="valor" id="eva-o2-a-valor">380 L</span></label>
+      <label>B · peso <input type="number" id="eva-masa-b" class="corto" min="40" max="150" step="1" value="70"> kg</label>
+      <label>B · O₂ <input type="range" id="eva-o2-b" min="100" max="600" step="10" value="380">
+        <span class="valor" id="eva-o2-b-valor">380 L</span></label>
+      <p class="nota">Nadie sale solo. Se planea con el más limitado de los dos, y desde cada punto se revisa
+        que puedan volver si uno se lesiona (mitad de velocidad, quien ayuda carga 30 kg más). 380 L ≈ tanque del EMU.</p>
+    </div>
+
+    <div class="seccion" data-modos="eva" hidden>
+      <h3>Radio y luz</h3>
+      <label><input type="checkbox" id="eva-radio" checked> Evitar zonas sin señal del hábitat</label>
+      <label>Fecha <input type="date" id="eva-fecha"></label>
+      <label>Salida <input type="range" id="eva-hora" min="5" max="17" step="0.25" value="9">
+        <span class="valor" id="eva-hora-valor">9:00</span></label>
+      <p class="nota">Hora solar local de Marte (12:00 = mediodía). La EVA no dura más que la luz que queda.</p>
+    </div>
+
+    <div class="seccion" data-modos="eva" hidden>
+      <h3>Colorear la ruta por</h3>
+      <select id="eva-color">
+        <option value="o2">Oxígeno al volver</option>
+        <option value="rescate">Rescate (compañero lesionado)</option>
+        <option value="radio">Señal de radio</option>
+        <option value="luz">Sol y sombra</option>
+      </select>
+      <div id="eva-leyenda"></div>
     </div>
   </div>
 

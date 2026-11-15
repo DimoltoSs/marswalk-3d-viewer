@@ -127,6 +127,38 @@ function tablaFrente(r, eva) {
   return `<table class="vs"><tr><th></th><th>Ciencia</th><th>Horas</th><th>${eva ? 'O₂ L' : 'Riesgo m'}</th></tr>${filas}</table>`;
 }
 
+const hora = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+
+/** EVA en pareja: oxígeno de cada uno, rescate, radio y luz. */
+function seccionPareja(r) {
+  if (!r.pareja?.length || !r.seguridad) return '';
+  const sg = r.seguridad, l = r.luz ?? {};
+  const personas = r.pareja.map((p, i) => {
+    const datos = r.pareja_info?.[i] ?? {};
+    const peor = r.pareja.reduce((k, q, j) => (q.tanque_final_pct < r.pareja[k].tanque_final_pct ? j : k), 0);
+    const lim = i === peor ? ' · el más justo' : '';
+    return dato(`${'AB'[i]} (${fmt(datos.masa_kg ?? 0)} kg${lim})`,
+      `${fmt(p.o2_usado_L)} / ${fmt(datos.o2_L ?? 0)} L · queda ${fmt(p.tanque_final_pct)} %`, p.tanque_final_pct < 15);
+  }).join('');
+  const rescate = r.sin_rescate == null
+    ? dato('Si uno se lesiona', `vuelven desde cualquier punto · sobran ≥ ${fmt(sg.rescate_min_L)} L`)
+    : dato('Si uno se lesiona', `⚠ desde el punto ${r.sin_rescate} ya no alcanza`, true);
+  return `
+    <div class="seccion"><h3>Pareja</h3>${personas}${rescate}
+      <p class="nota">Rescate: regreso a la mitad de velocidad y quien ayuda carga 30 kg más (supuesto),
+      probando a cada uno como lesionado; puede usarse la reserva de 10 %.</p>
+    </div><div class="seccion"><h3>Radio y luz</h3>
+      ${dato('Sin señal del hábitat', `${fmt(sg.sin_senal_pct, 1)} % · tramo máx. ${fmt(sg.sin_senal_max_m)} m`, sg.sin_senal_max_m > 300)}
+      ${dato('Luz del día', `${hora(l.amanecer ?? 0)} – ${hora(l.ocaso ?? 0)} (Ls ${fmt(l.ls ?? 0)}°)`)}
+      ${dato('Salida → regreso', `${hora(l.salida ?? 0)} → ${hora(sg.regreso_hora)}`, sg.noche)}
+      ${dato('Ruta en sombra', `${fmt(sg.sombra_pct, 1)} %`)}
+      <p class="nota">Radio: línea de vista entre el mástil del hábitat (${r.radio?.antena_habitat_m ?? 10} m) y la antena
+      del traje, con el relieve y la curvatura de Marte${r.radio?.evita_sin_senal ? '; la ruta evita las zonas sin señal' : ''}.
+      Luz: Sol de Marte para la fecha (Mars24) y sombra del relieve a la hora en que se pasa por cada punto.
+      Sol a la salida: ${fmt(l.sol_salida?.elev ?? 0)}° de altura.</p>
+    </div>`;
+}
+
 /** Fila de texto "nombre ........ valor" con el mismo estilo que las barras. */
 function dato(nombre, valor, alerta = false) {
   const estilo = alerta ? ' style="color:#ff6b6b"' : '';
@@ -136,7 +168,7 @@ function dato(nombre, valor, alerta = false) {
 export function mostrarMetricasVivo(modo, r) {
   const caja = document.getElementById('metricas-contenido');
   const eva = modo === 'eva';
-  const titulo = eva ? 'EVA de astronautas · 3 km' : 'Misión del robot · A → B';
+  const titulo = eva ? 'EVA en pareja · 3 km' : 'Misión del robot · A → B';
   if (!r || !r.plan) {
     const pista = eva ? 'Haz clic en el terreno para poner el hábitat.'
       : 'Haz clic en el terreno para poner el inicio (A) y luego el final (B).';
@@ -149,7 +181,7 @@ export function mostrarMetricasVivo(modo, r) {
   const sg = r.seguridad ?? {};
   const presupuesto = eva
     ? `${barra('Tiempo', m.horas, pres.h, 'h', 1)}
-       ${barra('Oxígeno', m.o2_L ?? 0, pres.o2_L, 'L')}
+       ${barra('Oxígeno (el más justo)', m.o2_L ?? 0, m.o2_usable_L ?? pres.o2_L, 'L')}
        ${dato('O₂ en el tanque al volver', `${fmt(sg.sobrante_L ?? 0)} L · ${fmt(sg.tanque_final_pct ?? 0)} %`,
     (sg.tanque_final_pct ?? 0) < 15)}
        ${dato('Punto más comprometido', `volver cuesta ${fmt(sg.o2_volver_critico_L ?? 0)} L`)}
@@ -157,11 +189,10 @@ export function mostrarMetricasVivo(modo, r) {
        ${barra('Alejamiento máx.', m.max_alejamiento_m, r.radio_m, 'm')}
        ${r.no_retorno != null ? '<p class="nota" style="color:#ff6b6b">⚠ Hay un punto sin oxígeno suficiente para volver.</p>' : ''}
        <p class="nota">A pie (~2 km/h), ida y vuelta al hábitat. Oxígeno según el gasto metabólico
-       (Pandolf, traje de 104 kg, gravedad de Marte). Tanque de ${fmt(r.o2_tanque_L ?? 380)} L.
+       (Pandolf, traje de 104 kg, gravedad de Marte). Se planea con el más limitado de la pareja.
        La vida primero: se descartan las misiones que volverían con menos de 10 % del tanque, y las
        misiones con nombre dejan al menos 15 %${r.descartadas_justas ? ` (${r.descartadas_justas} del frente quedaron fuera)` : ''}.
-       Ruta, según el O₂ que quedaría al volver desde cada punto: verde &gt; 25 %, amarillo 15–25 %,
-       rojo 10–15 %; morado = esfuerzo alto (el traje no alcanza a enfriar); pin naranja = desde donde volver cuesta más.</p>`
+       Colores de la ruta: ver "Colorear la ruta por" (panel izquierdo).</p>`
     : `${barra('Tiempo', m.horas, pres.h, 'h')}
        ${barra('Batería', m.wh, pres.wh, 'Wh')}
        <p class="nota">Presupuesto = ${r.factor} × la ruta directa A → B; la batería guarda 10 % de reserva.
@@ -180,6 +211,7 @@ export function mostrarMetricasVivo(modo, r) {
       <p class="nota">Riesgo (${u.riesgo}–${u.bloqueo}°): ${fmt(m.riesgo_km * 1000)} m · pendiente máx. ${fmt(m.pend_max, 1)}°
       · ${r.tramos_seguros} tramo(s) por la ruta segura.</p>
     </div>
+    ${eva ? seccionPareja(r) : ''}
     <div class="seccion"><h3>Frente de Pareto · ${r.frente.length} misiones</h3>
       ${tablaFrente(r, eva)}
       <p class="nota">NSGA-II v3 + Marswalk v4: ${r.generaciones} generaciones en ${fmt(r.segundos, 1)} s.

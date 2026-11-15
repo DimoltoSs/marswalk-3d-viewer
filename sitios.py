@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
 import mision_v3 as v3  # noqa: E402
 
 SITIOS = {
-    "jezero": {"titulo": "Jezero", "rover": "Perseverance", "carpeta_web": ""},
-    "gale": {"titulo": "Gale", "rover": "Curiosity", "carpeta_web": "gale"},
+    "jezero": {"titulo": "Jezero", "rover": "Perseverance", "carpeta_web": "", "lat": 18.43, "lon": 77.43},
+    "gale": {"titulo": "Gale", "rover": "Curiosity", "carpeta_web": "gale", "lat": -4.66, "lon": 137.41},
 }
 OPCIONALES = {"mineralogia": "mineralogia_crism_20m.tif", "mineralogia_confianza": "mineralogia_confianza_20m.tif",
               "arena_textura": "arena_textura_20m.tif", "arena_textura_cobertura": "arena_textura_cobertura_20m.tif"}

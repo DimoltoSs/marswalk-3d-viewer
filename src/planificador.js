@@ -30,7 +30,33 @@ const COLORES = {
   o2Poco: 0xff3b3b,    //       10-15 % (menos de 10 % = misión descartada por el servidor)
   intenso: 0xb45cff,   // EVA: tramos de más de 85 L/h de O2
   critico: 0xff8c1a,   // EVA: punto desde donde volver cuesta más O2
+  rescateOk: 0x3ddc84, rescateJusto: 0xffd23f, rescateNo: 0xff3b3b,   // margen si uno se lesiona: >50 L, 0-50 L, <0
+  senal: 0x2ee6ff, sinSenal: 0xff3b3b,                               // radio con el hábitat
+  sol: 0xffe066, sombra: 0x3a4a9c, noche: 0x111111,                   // luz a la hora en que se pasa por ahí
 };
+
+/** Cómo se colorea la ruta de la EVA y qué dice la leyenda. */
+const MODOS_COLOR = {
+  o2: {
+    color: (r, i) => { const p = r.tanque_pct[i]; return p > 25 ? COLORES.o2Sobra : p >= 15 ? COLORES.o2Justo : COLORES.o2Poco; },
+    leyenda: [['#3ddc84', '> 25 %'], ['#ffd23f', '15–25 %'], ['#ff3b3b', '10–15 % de O₂ (el peor de los dos)'],
+      ['#b45cff', 'esfuerzo alto'], ['#ff8c1a', 'punto más comprometido']],
+  },
+  rescate: {
+    color: (r, i) => { const m = r.margen_rescate_L[i]; return m > 50 ? COLORES.rescateOk : m >= 0 ? COLORES.rescateJusto : COLORES.rescateNo; },
+    leyenda: [['#3ddc84', 'sobran > 50 L'], ['#ffd23f', '0–50 L'], ['#ff3b3b', 'no alcanzan a volver si uno se lesiona']],
+  },
+  radio: {
+    color: (r, i) => (r.senal[i] ? COLORES.senal : COLORES.sinSenal),
+    leyenda: [['#2ee6ff', 'con señal del hábitat'], ['#ff3b3b', 'sin señal (el relieve tapa la antena)']],
+  },
+  luz: {
+    color: (r, i) => (r.hora_solar[i] < (r.luz?.amanecer ?? 0) || r.hora_solar[i] > (r.luz?.ocaso ?? 24)
+      ? COLORES.noche : r.sombra[i] ? COLORES.sombra : COLORES.sol),
+    leyenda: [['#ffe066', 'al sol'], ['#3a4a9c', 'en sombra del relieve'], ['#111111', 'de noche']],
+  },
+};
+const horaTexto = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
 
 /** Tramos seguidos del mismo valor: [[valor, desde, hasta], ...] (índices de puntos, inclusivos). */
 function tramosIguales(valores) {
@@ -46,8 +72,8 @@ const RADIO_EVA_M = 3000;
 const AYUDA = {
   libre: 'Robot: clic 1 = inicio (A), clic 2 = final (B). Se calcula la ruta que pasa por más '
     + 'minerales sin agotar la batería. Un 3.er clic empieza de nuevo. Arrastrar = mover la vista.',
-  eva: 'Astronautas: un clic = hábitat. Aparece el radio de 3 km y la mejor salida de ida y vuelta '
-    + 'que cabe en el oxígeno del traje y en 8 h. Otro clic lo mueve. Arrastrar = mover la vista.',
+  eva: 'Pareja de astronautas: un clic = hábitat. Aparece el radio de 3 km y la mejor salida de ida y vuelta '
+    + 'que cabe en el oxígeno de los dos, en 8 h y en la luz del día. Otro clic lo mueve. Arrastrar = mover la vista.',
 };
 const BOTON_AUTO = { libre: 'Puntos aleatorios', eva: 'Mejor centroide' };
 
@@ -113,13 +139,19 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
     }
   }
 
-  /** EVA: la ruta se colorea por el margen de O2 para volver; encima, los tramos de esfuerzo alto. */
+  /** EVA: la ruta se colorea según el selector (oxígeno, rescate, radio o luz).
+   *  Con "oxígeno", además, los tramos de esfuerzo alto y el punto más comprometido. */
   function dibujarEva(r) {
-    const nivel = r.tanque_pct.slice(0, -1).map((p) => (
-      p > 25 ? COLORES.o2Sobra : p >= 15 ? COLORES.o2Justo : COLORES.o2Poco));
+    const modoColor = MODOS_COLOR[$('eva-color').value] ?? MODOS_COLOR.o2;
+    const nivel = r.plan.slice(0, -1).map((_, i) => modoColor.color(r, i));
     for (const [color, i, j] of tramosIguales(nivel)) {
       capas.plan.add(crearTubo(terreno, r.plan.slice(i, j + 1), color, 0.25));
     }
+    if ($('eva-color').value === 'rescate' && r.sin_rescate != null) {
+      const p = r.plan[r.sin_rescate];
+      capas.plan.add(crearPin(terreno, p[0], p[1], COLORES.rescateNo, 3));
+    }
+    if ($('eva-color').value !== 'o2') return;
     const intenso = r.intensidad_Lh.map((v) => v > (resultado.intensidad_max_ok_Lh ?? 85));
     for (const [es, i, j] of tramosIguales(intenso)) {
       if (es) capas.plan.add(crearTubo(terreno, r.plan.slice(i, j + 1), COLORES.intenso, 0.32));
@@ -129,7 +161,24 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
   }
 
   const estado = (texto) => { $('vivo-info').textContent = texto; };
-  const o2Traje = () => Number($('vivo-o2').value);
+
+  /** Lo que se manda al servidor en una EVA: pareja, radio y luz. */
+  function cuerpoEva() {
+    const persona = (l) => ({ masa_kg: Number($(`eva-masa-${l}`).value) || 75, o2_L: Number($(`eva-o2-${l}`).value) });
+    return {
+      prioridad,
+      pareja: [persona('a'), persona('b')],
+      evitar_sin_senal: $('eva-radio').checked,
+      fecha: $('eva-fecha').value || null,
+      hora_salida: Number($('eva-hora').value),
+    };
+  }
+
+  function dibujarLeyenda() {
+    const m = MODOS_COLOR[$('eva-color').value] ?? MODOS_COLOR.o2;
+    $('eva-leyenda').innerHTML = m.leyenda
+      .map(([c, t]) => `<label><span class="muestra" style="background:${c}"></span> ${t}</label>`).join('');
+  }
 
   /** Pide la ruta del modo actual y la dibuja (si nadie hizo otro clic mientras tanto). */
   async function calcular() {
@@ -137,8 +186,7 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
     estado('Calculando…');
     try {
       const r = modo === 'eva'
-        ? await api('eva', puntos.length ? { habitat: puntos[0], prioridad, o2_L: o2Traje() }
-          : { prioridad, o2_L: o2Traje() })
+        ? await api('eva', puntos.length ? { habitat: puntos[0], ...cuerpoEva() } : cuerpoEva())
         : await api('libre', { inicio: puntos[0], fin: puntos[1], prioridad });
       if (id !== peticion) return;              // llegó tarde: ya hay un clic más nuevo
       resultado = r;
@@ -162,9 +210,19 @@ export function crearPlanificador(terreno, camera, canvas, avisos) {
   }
   $('vivo-prioridad').addEventListener('change', (e) => aplicarPrioridad(e.target.value));
 
-  // O2 del traje: cambia el presupuesto de la EVA -> hay que volver a calcular
-  $('vivo-o2').addEventListener('input', (e) => { $('vivo-o2-valor').textContent = `${e.target.value} L`; });
-  $('vivo-o2').addEventListener('change', () => { if (modo === 'eva' && puntos.length) calcular(); });
+  // Controles de la EVA: cualquiera cambia el problema -> volver a calcular (si ya hay hábitat)
+  const recalcularEva = () => { if (modo === 'eva' && puntos.length) calcular(); };
+  for (const l of ['a', 'b']) {
+    $(`eva-o2-${l}`).addEventListener('input', (e) => { $(`eva-o2-${l}-valor`).textContent = `${e.target.value} L`; });
+    $(`eva-o2-${l}`).addEventListener('change', recalcularEva);
+    $(`eva-masa-${l}`).addEventListener('change', recalcularEva);
+  }
+  $('eva-hora').addEventListener('input', (e) => { $('eva-hora-valor').textContent = horaTexto(Number(e.target.value)); });
+  for (const id of ['eva-hora', 'eva-radio', 'eva-fecha']) $(id).addEventListener('change', recalcularEva);
+  $('eva-fecha').value = new Date().toISOString().slice(0, 10);
+  // Cambiar el color no recalcula: solo se vuelve a dibujar
+  $('eva-color').addEventListener('change', () => { dibujarLeyenda(); dibujar(); });
+  dibujarLeyenda();
 
   function nuevoPunto(xy) {
     if (modo === 'eva') puntos = [xy];

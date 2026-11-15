@@ -15,7 +15,16 @@ import { SITIO, INFO, prepararPanel } from './sitio.js';
 async function iniciar() {
   prepararPanel();                              // lugar (Jezero / Gale): títulos y misiones disponibles
   const canvas = document.getElementById('lienzo');
-  const { renderer, scene, camera } = crearEscena(canvas);
+  const { renderer, scene, camera, sol } = crearEscena(canvas);
+  const solInicial = sol.position.clone();
+  /** EVA: la luz de la escena sale del Sol real a la hora de salida; en los demás modos, el Sol de siempre. */
+  function ponerSol(s) {
+    if (!s) { sol.position.copy(solInicial); sol.intensity = 3.0; return; }
+    const el = THREE.MathUtils.degToRad(Math.max(s.elev, 2)), az = THREE.MathUtils.degToRad(s.azimut);
+    // escena: x = Este, y = arriba, z = Sur
+    sol.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).multiplyScalar(160);
+    sol.intensity = s.elev > 0 ? 3.0 : 0.3;
+  }
 
   // Ratón: arrastrar = girar, rueda = zoom, clic derecho = desplazar
   const controles = new OrbitControls(camera, canvas);
@@ -159,6 +168,7 @@ async function iniciar() {
     alCambiar(resultado) {                      // hay ruta nueva, o se borró
       if (!esVivo()) return;
       mostrarMetricasVivo(modo, resultado);
+      ponerSol(modo === 'eva' ? resultado?.luz?.sol_salida : null);
       arrancarRecorrido(resultado?.plan ?? null);
       seleccion.refrescar();
       recalcularSombras();
@@ -215,6 +225,7 @@ async function iniciar() {
       modo = valor;
       mostrarSecciones();
       if (modo !== 'rutas_v2.json') apagarReplaneo();   // el peligro simulado es sobre el plan v2
+      if (modo !== 'eva') ponerSol(null);
       if (esVivo()) {
         planificador.cambiarModo(modo);         // mapa limpio, a esperar clics
       } else {
