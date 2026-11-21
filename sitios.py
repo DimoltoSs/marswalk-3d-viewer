@@ -1,10 +1,10 @@
 """sitios.py - Lugares de Marte que conoce el visor. Todos usan la misma malla (1000 x 1000 celdas de 20 m,
 x este / y norte en metros desde el centro) y el mismo modelo (mision_v3.py); solo cambian las capas de datos.
 
-  jezero : capas de ../data/processed (proto1_capas.cargar), como siempre.
-  gale   : capas de ../data/gale/processed (relieve del DEM de MSL; arena y minerales APROXIMADOS, ver
+  jezero : capas de data/processed (proto1_capas.cargar), como siempre.
+  gale   : capas de data/gale/processed (relieve del DEM de MSL; arena y minerales APROXIMADOS, ver
            mapas_marte/herramientas). Ruta real = Curiosity.
-Para agregar otro lugar: una carpeta ../data/<nombre>/processed con dem_20m.tif, slope_20m_deg.tif y malla.json
+Para agregar otro lugar: una carpeta data/<nombre>/processed con dem_20m.tif, slope_20m_deg.tif y malla.json
 (opcionales: minerales, arena, ruta real), una entrada en SITIOS y `python exportar_sitio.py <nombre>`.
 """
 import json
@@ -14,7 +14,7 @@ import sys
 import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
+sys.path.insert(0, AQUI)
 import mision_v3 as v3  # noqa: E402
 
 SITIOS = {
@@ -30,8 +30,8 @@ v3.NOMBRES.setdefault(11, "Sulfato")
 
 
 def carpeta_datos(sitio):
-    return os.path.join(AQUI, "..", "data", "processed") if sitio == "jezero" \
-        else os.path.join(AQUI, "..", "data", sitio, "processed")
+    return os.path.join(AQUI, "data", "processed") if sitio == "jezero" \
+        else os.path.join(AQUI, "data", sitio, "processed")
 
 
 def carpeta_web(sitio):

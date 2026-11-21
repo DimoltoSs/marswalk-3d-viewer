@@ -102,11 +102,39 @@ El plan v2 y lo demás lo genera el notebook `../notebooks/planificador_v2.ipynb
 - Sección 13.4 → comparación con Perseverance dentro de `rutas_v2.json`, `capa_crism.png`,
   `capa_costo.png` y `capas.json`.
 
-Estos scripts leen archivos **fuera de esta carpeta**, del proyecto principal:
+Todo lo que necesitan está **dentro de esta carpeta** (antes dependían de `../data` y `../prototipo_uno`):
 
-- `../data/processed/` — capas alineadas en una malla de 1000 × 1000 celdas de 20 m.
-- `../prototipo_uno/` — mapa de costos, selección de objetivos y A\* (`exportar_rutas.py` los importa).
-- `../notebooks/planificador_v2.ipynb` — planificador v2 (mapa de costos, A\*, NSGA-II y comparación con NASA).
+- `data/processed/`: capas de Jezero alineadas en una malla de 1000 × 1000 celdas de 20 m.
+- `data/gale/processed/`: capas de Gale (relieve real; arena y minerales aproximados).
+- `proto1_*.py`: mapa de costos, objetivos y A\* del prototipo 1 (los usan `exportar_rutas.py`, `servidor.py` y `replaneo.py`).
+
+Lo único que sigue afuera es el notebook histórico `../notebooks/planificador_v2.ipynb`, que generó `rutas_v2.json`.
+El visor ya usa el planificador v3/v4, así que no hace falta para editar.
+
+## Planificador (Python)
+
+El modelo vive aquí, y desde aquí se edita:
+
+| Archivo | Qué hace |
+|---|---|
+| `mision_v3.py` | Planificador v3 + Marswalk v4: mapa de costos, rutas normal/segura, NSGA-II, búsqueda local, astronauta con Pandolf + Santee, punto de no retorno |
+| `eva_avanzada.py` | EVA en pareja (O₂ de cada uno y rescate), radio con el hábitat e iluminación. Incluye lo que antes era `eva_pareja.py` (`perfil_pareja`, `senal_en_camino`) |
+| `sitios.py` | Jezero y Gale: de dónde salen las capas de cada sitio |
+| `servidor.py` | API para el visor (`/api/eva`, `/api/libre`, `/api/ruta`…) |
+| `api.py` + `cliente_rpi.py` | API para que la Raspberry Pi pida rutas (también con Docker: `docker compose up -d --build`) |
+| `exportar_mision_v3.py` | Misión del rover para el visor (`public/data/rutas_v3.json`), también en lon/lat para Jezero |
+| `validar_seitah.py` | Compara las rutas con el recorrido real de Perseverance (tramo B: v3 498 m → v4 118–125 m) |
+| `herramientas/preparar_capas_marswalk.py` | Regenera las capas de arena y pendiente HiRISE desde los productos públicos |
+| `demo_planificador_v3.ipynb` | Recorrido paso a paso del planificador |
+| `tests/` | 70 pruebas (`cd tests && python -m pytest -q`) |
+| `CAMBIOS_V4.md` | Cambios de Marswalk v4 y evaluación del planificador |
+
+```bash
+pip install -r requirements.txt
+uvicorn servidor:app --port 8000          # API del visor
+cd tests && python -m pytest -q           # 70 pruebas
+python validar_seitah.py                  # validación contra Perseverance
+```
 
 ## Estructura
 
@@ -135,8 +163,12 @@ visor_3d/
 │   │   └── capas.json      # leyendas de las capas
 │   └── modelos/
 │       └── perseverance.glb
-├── exportar_terrenos.py
-├── exportar_rutas.py
+├── data/                   # capas de entrada (Jezero y Gale)
+├── tests/                  # 70 pruebas del planificador y la EVA
+├── herramientas/           # regenerar capas HiRISE
+├── mision_v3.py, eva_avanzada.py, sitios.py, proto1_*.py   # modelo
+├── servidor.py, api.py, cliente_rpi.py                     # APIs
+├── exportar_*.py, validar_seitah.py
 ├── requirements.txt
 └── package.json
 ```
@@ -217,7 +249,7 @@ Cada EVA tarda unos 6–9 s (antes ~2 s). Lo nuevo (regresos de los dos, rescate
 el resto es el algoritmo genético y la búsqueda del mejor centroide, que ya existían.
 
 ### Archivos
-- Nuevo: `eva_avanzada.py`.
+- Nuevo: `eva_avanzada.py` (en nov. 2026 se le sumó lo de `eva_pareja.py` del planificador).
 - Cambiaron: `servidor.py` (endpoint `/api/eva`), `sitios.py` (latitud de cada sitio), `index.html`,
   `src/main.js` (Sol de la escena), `src/planificador.js` (controles y colores), `src/metricas.js` (secciones Pareja,
   Radio y luz).

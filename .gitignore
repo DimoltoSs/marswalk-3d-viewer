@@ -20,3 +20,9 @@ modelos_3d/
 .DS_Store
 Thumbs.db
 *.log
+
+# Pruebas, notebooks y cliente de la Raspberry
+.pytest_cache/
+.hypothesis/
+.ipynb_checkpoints/
+ultimo_plan.json

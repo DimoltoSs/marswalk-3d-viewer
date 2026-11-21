@@ -4,7 +4,7 @@ import sys
 import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
+sys.path.insert(0, AQUI)
 from proto1_planificador import astar
 
 def bloquear_circulo(costo, centro, radio_m, res=20.0):

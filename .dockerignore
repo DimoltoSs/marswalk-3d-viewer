@@ -1,0 +1,13 @@
+.git
+__pycache__
+.ipynb_checkpoints
+salida
+*.ipynb
+ultimo_plan.json
+node_modules
+public
+src
+modelos_3d
+_respaldo_v3
+data/gale
+tests

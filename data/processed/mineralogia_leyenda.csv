@@ -1,0 +1,13 @@
+codigo,mineral,rgb_confianza_alta,rgb_confianza_media,celdas_20m
+0,Sin identificar (negro),0 0 0,,437645
+1,Olivine,255 0 0,153 0 0,69622
+2,Mg-Carbonate,0 255 0,0 153 0,47138
+3,Fe/Mg-Smectite,0 255 255,0 153 153,4689
+4,Olivine+Smectite,255 128 114,153 77 68,54393
+5,Olv. Smect + 2.2um,128 128 0,77 77 0,515
+6,Carb. + 2.2um,255 215 0,153 129 0,2199
+7,High Ca Pyroxene,255 128 0,153 77 0,38964
+8,Low Ca Pyroxene,218 165 32,130 99 19,161
+9,Kaolinite,139 69 19,83 41 11,19
+10,Mg-Smectite 2,0 0 255,0 0 153,246
+255,Sin dato (fuera de escenas CRISM),,,344409

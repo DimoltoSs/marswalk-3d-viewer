@@ -1,0 +1,18 @@
+{
+ "sitio": "Gale (Curiosity)",
+ "res_m": 20.0,
+ "shape": [
+  1000,
+  1000
+ ],
+ "extent_m": [
+  -10000.0,
+  10000.0
+ ],
+ "centro_lat_lon": [
+  -4.66,
+  137.41
+ ],
+ "crs_proj4": "+proj=eqc +lat_ts=-4.66 +lat_0=-4.66 +lon_0=137.41 +R=3396190.0 +units=m +no_defs",
+ "fuente_dem": "USGS Astropedia: Mars MSL Gale Merged DEM 1m v3 (Parker & Calef 2016)"
+}

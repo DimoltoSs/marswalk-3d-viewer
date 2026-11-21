@@ -1,0 +1,68 @@
+{
+ "A · v3 original": {
+  "km": 0.82,
+  "modelo_a_real_m": 83,
+  "real_a_modelo_m": 225,
+  "simetrica_m": 154,
+  "hausdorff_m": 621
+ },
+ "A · v4 arena": {
+  "km": 1.85,
+  "modelo_a_real_m": 49,
+  "real_a_modelo_m": 52,
+  "simetrica_m": 51,
+  "hausdorff_m": 154
+ },
+ "A · v4 arena + HiRISE": {
+  "km": 1.87,
+  "modelo_a_real_m": 55,
+  "real_a_modelo_m": 60,
+  "simetrica_m": 58,
+  "hausdorff_m": 140
+ },
+ "A · odómetro real km": 2.66,
+ "B · v3 original": {
+  "km": 3.02,
+  "modelo_a_real_m": 376,
+  "real_a_modelo_m": 620,
+  "simetrica_m": 498,
+  "hausdorff_m": 1450
+ },
+ "B · v4 arena": {
+  "km": 4.65,
+  "modelo_a_real_m": 92,
+  "real_a_modelo_m": 158,
+  "simetrica_m": 125,
+  "hausdorff_m": 612
+ },
+ "B · v4 arena + HiRISE": {
+  "km": 4.68,
+  "modelo_a_real_m": 85,
+  "real_a_modelo_m": 151,
+  "simetrica_m": 118,
+  "hausdorff_m": 612
+ },
+ "B · odómetro real km": 6.97,
+ "C · v3 original": {
+  "km": 0.57,
+  "modelo_a_real_m": 127,
+  "real_a_modelo_m": 150,
+  "simetrica_m": 139,
+  "hausdorff_m": 218
+ },
+ "C · v4 arena": {
+  "km": 0.9,
+  "modelo_a_real_m": 43,
+  "real_a_modelo_m": 40,
+  "simetrica_m": 42,
+  "hausdorff_m": 98
+ },
+ "C · v4 arena + HiRISE": {
+  "km": 0.9,
+  "modelo_a_real_m": 43,
+  "real_a_modelo_m": 41,
+  "simetrica_m": 42,
+  "hausdorff_m": 98
+ },
+ "C · odómetro real km": 1.03
+}

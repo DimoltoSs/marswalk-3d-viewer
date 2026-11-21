@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
+sys.path.insert(0, AQUI)
 from proto1_capas import rc_a_xy, xy_a_rc                    # noqa: E402
 from proto1_mapa_costos import construir_costo               # noqa: E402
 from proto1_planificador import planear_mision              # noqa: E402

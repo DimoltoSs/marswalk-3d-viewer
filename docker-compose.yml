@@ -1,0 +1,9 @@
+services:
+  planificador:
+    build: .
+    image: planificador-marswalk:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-}     # opcional: export API_KEY=algo antes de "docker compose up"
+    restart: unless-stopped

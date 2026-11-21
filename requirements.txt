@@ -1,12 +1,18 @@
-# Dependencias de los scripts de exportación (exportar_terrenos.py, exportar_rutas.py).
-# El visor en sí solo necesita Node.js (ver package.json).
+# Python de visor_3d: planificador (mision_v3.py), EVA (eva_avanzada.py), servidor del visor (servidor.py),
+# API para la Raspberry (api.py), exportadores y pruebas. El visor web solo necesita Node.js (ver package.json).
 numpy
+scipy
+pymoo
 rasterio
 Pillow
-# exportar_rutas.py importa el planificador de ../prototipo_uno, que además usa:
-scipy
 scikit-image
-# servidor.py (API local para el visor) y el planificador v3 (mision_v3.py):
+pyproj
+shapely
+matplotlib
 fastapi
 uvicorn
-pymoo
+# pruebas y notebook
+pytest
+hypothesis
+networkx
+jupyter

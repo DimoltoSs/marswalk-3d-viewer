@@ -8,7 +8,7 @@ import rasterio
 from PIL import Image
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-ENTRADA = os.path.join(AQUI, "..", "data", "processed")
+ENTRADA = os.path.join(AQUI, "data", "processed")
 SALIDA = os.path.join(AQUI, "public", "data")
 N = 400   # vértices por lado: 400 x 400 = 160k, suficiente detalle y carga rápida
 

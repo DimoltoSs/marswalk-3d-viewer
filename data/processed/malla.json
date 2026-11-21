@@ -1,0 +1,16 @@
+{
+ "crs_proj4": "+proj=eqc +lat_ts=18.43 +lat_0=18.43 +lon_0=77.43 +x_0=0 +y_0=0 +R=3396190 +units=m +no_defs=True",
+ "res_m": 20.0,
+ "shape": [
+  1000,
+  1000
+ ],
+ "extent_m": [
+  -10000.0,
+  10000.0
+ ],
+ "centro_lat_lon": [
+  18.43,
+  77.43
+ ]
+}

@@ -10,7 +10,7 @@ import sys
 import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))                 # .../NASA_SAC/visor_3d
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))     # módulos del prototipo 1
+sys.path.insert(0, AQUI)
 SALIDA = os.path.join(AQUI, "public", "data", "rutas.json")
 
 from proto1_capas import cargar, rc_a_xy                           # noqa: E402

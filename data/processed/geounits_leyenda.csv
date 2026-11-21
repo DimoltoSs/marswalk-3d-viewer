@@ -1,0 +1,15 @@
+unit,name,symbol,celdas
+0,Jezero fan 2 unit,NHjf2,67732
+1,Jezero fan 1 unit,NHjf1,17117
+2,Jezero floor unit,Njf,332224
+3,Lower etched unit,Nle,124785
+4,Nili Planum fan unit,Hnpf,0
+5,Nili Planum 2 unit,Nnp2,3329
+6,Nili Planum 1 unit,Nnp1,15278
+7,Eolian bedform unit,Aeb,120306
+8,"Smooth unit, undivided",su,41620
+9,Rugged bright unit,Nrb,0
+10,Upper etched unit,Nue,140323
+11,Crater rim unit,cr,137286
+12,Crater ejecta unit,ce,0
+13,Crater interior unit,ci,0

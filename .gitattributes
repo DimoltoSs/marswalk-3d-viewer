@@ -6,3 +6,6 @@
 *.glb  binary
 *.jpg  binary
 *.png  binary
+*.tif  binary
+*.npz  binary
+*.pt   binary

@@ -17,8 +17,8 @@ import sys
 import numpy as np
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(AQUI, "..", "prototipo_uno"))
-from proto1_capas import rc_a_xy  # noqa: E402
+sys.path.insert(0, AQUI)
+from proto1_capas import rc_a_xy, xy_a_lonlat  # noqa: E402
 
 import mision_v3 as v3  # noqa: E402
 import sitios  # noqa: E402
@@ -30,6 +30,12 @@ def a_xy(celdas):
     a = np.asarray(celdas)
     x, y = rc_a_xy(a[:, 0], a[:, 1])
     return np.round(np.c_[x, y], 1).tolist()
+
+
+def a_lonlat(xy):
+    a = np.asarray(xy, float)
+    lon, lat = xy_a_lonlat(a[:, 0], a[:, 1])
+    return np.round(np.c_[lon, lat], 6).tolist()
 
 
 def main():
@@ -88,6 +94,14 @@ def main():
         "nombradas": plan["nombradas"],
     }
     salida["aviso"] = plan.get("aviso")
+    if a.sitio == "jezero":   # lon/lat para MapLibre (la proyección local de proto1_capas es la de Jezero)
+        salida["lonlat"] = {"crs": "lon/lat planetocéntricas, esfera de Marte R=3396190 m",
+                            "plan": a_lonlat(salida["plan"]), "waypoints": a_lonlat(salida["waypoints"]),
+                            "real": a_lonlat(salida["real"]), "inicio": a_lonlat([salida["inicio"]])[0],
+                            "meta": a_lonlat([salida["meta"]])[0],
+                            "objetivos": a_lonlat([[o["x"], o["y"]] for o in salida["objetivos"]]) if salida["objetivos"] else []}
+    if plan.get("aviso"):
+        print("AVISO:", plan["aviso"])
     with open(a.salida, "w", encoding="utf-8") as f:
         json.dump(salida, f, ensure_ascii=False)
     m = salida["metricas"]
