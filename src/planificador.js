@@ -77,6 +77,10 @@ const AYUDA = {
 };
 const BOTON_AUTO = { libre: 'Puntos aleatorios', eva: 'Mejor centroide' };
 
+// Dirección del servidor de Python. Vacía = el mismo sitio (local con Vite). Para un servidor en internet:
+// crear .env con VITE_API_URL=https://tu-servidor antes de `npm run build`.
+const API_URL = import.meta.env.VITE_API_URL ?? '';
+
 /** Pide algo al servidor. Sin cuerpo = GET; con cuerpo = POST con JSON. */
 async function api(ruta, cuerpo) {
   const opciones = cuerpo === undefined ? {} : {
@@ -84,9 +88,11 @@ async function api(ruta, cuerpo) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cuerpo),
   };
-  const resp = await fetch(conSitio(`/api/${ruta}`), opciones);
+  const resp = await fetch(conSitio(`${API_URL}/api/${ruta}`), opciones);
   const esJson = resp.headers.get('content-type')?.includes('json');
-  if (!esJson) throw new Error('El servidor no responde: arranca servidor.py (puerto 8000).');
+  if (!esJson) throw new Error(API_URL || location.hostname === 'localhost'
+    ? 'El servidor no responde: arranca servidor.py (puerto 8000).'
+    : 'El planificador en vivo necesita el servidor de Python; en esta versión web solo se ven las rutas precalculadas.');
   const datos = await resp.json();
   if (!resp.ok) {
     // FastAPI manda el motivo en "detail" (texto, o una lista si falló la validación)

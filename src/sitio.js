@@ -14,7 +14,7 @@ export const SITIO = pedido && pedido in SITIOS ? pedido : 'jezero';
 export const INFO = SITIOS[SITIO];
 
 /** Dirección de un archivo de datos del sitio activo. */
-export const rutaDatos = (archivo) => `/data/${INFO.carpeta}${archivo}`;
+export const rutaDatos = (archivo) => `${import.meta.env.BASE_URL}data/${INFO.carpeta}${archivo}`;
 
 /** Agrega ?sitio=... a una ruta del servidor. */
 export const conSitio = (ruta) => `${ruta}${ruta.includes('?') ? '&' : '?'}sitio=${SITIO}`;

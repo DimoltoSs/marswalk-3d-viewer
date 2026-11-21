@@ -6,7 +6,7 @@ import { ESCALA_M } from './terreno.js';
  * Carga el modelo de Perseverance (NASA/JPL), centrado y con las ruedas en y = 0.
  * escalaVisual: factor de agrandamiento; a escala real mediría menos de un píxel.
  */
-export async function cargarRover({ url = '/modelos/perseverance.glb', escalaVisual = 60 } = {}) {
+export async function cargarRover({ url = `${import.meta.env.BASE_URL}modelos/perseverance.glb`, escalaVisual = 60 } = {}) {
   const gltf = await new GLTFLoader().loadAsync(url);
   const modelo = gltf.scene;                       // en metros, y hacia arriba
 

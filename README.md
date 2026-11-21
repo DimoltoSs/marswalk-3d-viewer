@@ -182,20 +182,61 @@ visor_3d/
 
 ## Datos y créditos
 
-| Dato | Fuente |
-|---|---|
-| Elevación (DTM CTX 20 m) y ortoimagen CTX | Mars 2020 Terrain Relative Navigation, USGS Astrogeology (MRO CTX) |
-| Mineralogía CRISM (para elegir objetivos) | Parente, Itoh y Saranathan, UMass — [Zenodo 5575824](https://zenodo.org/records/5575824), licencia **CC-BY 4.0** |
-| Unidades geológicas (para el mapa de costos) | Sun y Stack, USGS SIM 3464 — Mapa geológico de Jezero y Nili Planum |
-| Ruta real de Perseverance | Waypoints de la misión Mars 2020 (NASA), vía [stiles/mars-perseverance-waypoints](https://github.com/stiles/mars-perseverance-waypoints) |
-| Modelo 3D de Perseverance | NASA/JPL-Caltech — [Mars Perseverance Rover, 3D Model](https://science.nasa.gov/resource/mars-perseverance-rover-3d-model/) |
+Todos los datos son públicos. El código del proyecto es nuestro; los datos conservan la licencia de su fuente.
+Este proyecto no está afiliado a NASA ni la representa, y no usa sus logotipos.
+
+### Jezero
+
+| Dato | Fuente | Licencia / uso |
+|---|---|---|
+| Elevación CTX 20 m y ortoimagen CTX 6 m | USGS Astrogeology, Mars 2020 Terrain Relative Navigation ([DTM](https://astrogeology.usgs.gov/search/map/Mars/Mars2020/JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0), [orto](https://astrogeology.usgs.gov/search/map/Mars/Mars2020/JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0)) | Dominio público (USGS / NASA) |
+| Elevación y ortoimagen HiRISE (DTM 1 m de Jezero norte; orto ESP_045994 para la capa de arena) | USGS Astrogeology, [Mars 2020 TRN HiRISE DTM Mosaic](https://astrogeology.usgs.gov/search/map/mars_2020_terrain_relative_navigation_hirise_dtm_mosaic) — HiRISE: NASA/JPL-Caltech/UArizona | Dominio público (USGS / NASA) |
+| Relieve regional 200 m | USGS Astrogeology, [Mars HRSC MOLA Blended DEM Global 200 m](https://astrogeology.usgs.gov/search/map/Mars/Topography/HRSC_MOLA_Blend/Mars_HRSC_MOLA_BlendDEM_Global_200mp) — MOLA: NASA/GSFC; HRSC: ESA/DLR/FU Berlin | Uso libre con crédito |
+| Mineralogía CRISM | Parente, Itoh y Saranathan (UMass), [Zenodo 5575824](https://zenodo.org/records/5575824) | **CC-BY 4.0** (crédito obligatorio) |
+| Unidades geológicas | Sun, V. Z. y Stack, K. M., *Geologic map of Jezero crater and the Nili Planum region, Mars*, [USGS SIM 3464](https://pubs.usgs.gov/sim/3464/) | Dominio público (USGS) |
+| Recorrido de Perseverance (visor) | Waypoints de la misión Mars 2020, NASA/JPL-Caltech ([mapa de la misión](https://science.nasa.gov/mission/mars-2020-perseverance/location-map/)), obtenidos con [stiles/mars-perseverance-waypoints](https://github.com/stiles/mars-perseverance-waypoints) | Datos de NASA; el repo intermediario no declara licencia |
+| Recorrido de Perseverance (validación, `M20_traverse.json` y `M20_waypoints.json`) | NASA/JPL-Caltech, mapa de la misión Mars 2020 | Datos de NASA |
+
+### Gale
+
+| Dato | Fuente | Licencia / uso |
+|---|---|---|
+| Elevación | Parker, T. y Calef III, F. J. (2016), [Mars MSL Gale Merged DEM 1m](https://astrogeology.usgs.gov/search/map/mars_msl_gale_merged_dem_1m), USGS Astrogeology | Dominio público (USGS / NASA) |
+| Foto a color | Calef III, F. J. y Parker, T., [MSL Gale Merged Orthophoto Mosaic](https://astrogeology.usgs.gov/search/map/mars_msl_gale_merged_orthophoto_mosaic_25cm) (versión HiRISE color) | Dominio público (USGS / NASA) |
+| Recorrido de Curiosity | NASA/JPL-Caltech, mapa de la misión MSL | Datos de NASA |
+| Arena y minerales | **Aproximados** por el equipo; no son un producto oficial | — |
+
+### Modelo 3D
+
+| Recurso | Fuente | Licencia / uso |
+|---|---|---|
+| Perseverance | NASA/JPL-Caltech, [Mars Perseverance Rover 3D Model](https://science.nasa.gov/resource/mars-perseverance-rover-3d-model/) | [Lineamientos de uso de medios de NASA](https://www.nasa.gov/nasa-brand-center/images-and-media/) |
+
+### Modelos y parámetros
+
+- Gasto metabólico al caminar: Pandolf, Givoni y Goldman (1977), *J. Appl. Physiol.* 43(4); corrección en bajada de Santee et al. (2001); forma usada por Kim et al., IEEE EMBC 2024 (NASA JSC, NTRS 20240001423).
+- Masa del traje (104 kg): NASA, ICES 2026 (NTRS 20260005410).
+- Posición del Sol en Marte: algoritmo Mars24, Allison y McEwen (2000), *Planet. Space Sci.* 48.
+- Velocidad y consumo del rover: NASA/JPL, componentes del rover Perseverance.
+- Supuestos propios (no son datos de NASA): valor de cada mineral, velocidad asistida (50 %) y carga extra (30 kg) en el rescate.
+
+### Software
+
+[Three.js](https://threejs.org/) y [Vite](https://vite.dev/) (MIT), [pymoo](https://pymoo.org/) (Apache 2.0), FastAPI (MIT), NumPy, SciPy, rasterio y scikit-image (BSD).
 
 Los objetivos científicos y el plan son resultado de **nuestro** planificador; el valor asignado a
 cada mineral es un criterio del equipo, no una valoración de NASA.
 
+## Ver en línea
+
+El visor se publica en GitHub Pages con cada push a `master` (`.github/workflows/deploy.yml`):
+**https://dimoltoss.github.io/marswalk-3d-viewer/**. Ahí se ven el relieve, las capas y las rutas precalculadas; el
+planificador en vivo (EVA, ruta libre) necesita `servidor.py`. Para usarlo con un servidor en internet, construir con
+`VITE_API_URL=https://tu-servidor` en un archivo `.env`.
+
 ## Pendiente
 
-- Publicar en GitHub Pages para verlo sin instalar nada.
+- Hospedar `servidor.py` en internet para usar el planificador en vivo desde la versión web.
 - Versión optimizada del modelo del rover (menos triángulos y texturas comprimidas).
 
 ## EVA en pareja, radio y luz (eva_avanzada.py)
