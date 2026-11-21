@@ -109,7 +109,7 @@ def pandolf_w(agente: Agente, v_m_s, grado_pct, eta):
     W, Lk = agente.masa_kg, agente.traje_kg + agente.kit_kg
     M = 1.5 * W + 2.0 * (W + Lk) * (Lk / W) ** 2 + eta * (W + Lk) * (1.5 * v_m_s ** 2 + 0.35 * v_m_s * grado_pct)
     cf = eta * ((grado_pct * (W + Lk) * v_m_s) / 3.5 - (W + Lk) * (grado_pct + 6) ** 2 / W + 25 - v_m_s ** 2)
-    M = np.where(grado_pct < 0, M + cf, M)
+    M = np.where(grado_pct < 0, M - cf, M)   # MF = MP - CF (Kim et al. 2024, ec. 1): en bajada se RESTA CF
     return np.maximum(M, 1.5 * W) * agente.g_rel
 
 
